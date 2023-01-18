@@ -18,6 +18,7 @@ impl Default for Message {
     }
 }
 
+#[derive(Default)]
 pub struct MessageBuilder {
     msg: Message,
 }

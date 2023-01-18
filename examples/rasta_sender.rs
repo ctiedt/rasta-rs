@@ -4,7 +4,7 @@ use rasta_rs::{RastaCommand, RastaConnection};
 
 fn main() {
     let addr: SocketAddrV4 = "127.0.0.1:8888".parse().unwrap();
-    let mut conn = RastaConnection::new(addr, 1234);
+    let mut conn = RastaConnection::try_new(addr, 1234).unwrap();
     let mut sent = false;
     conn.run(5678, || {
         if !sent {
@@ -13,5 +13,6 @@ fn main() {
         } else {
             RastaCommand::Wait
         }
-    });
+    })
+    .unwrap();
 }

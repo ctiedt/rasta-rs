@@ -8,6 +8,6 @@ fn on_receive(msg: Message) {
 
 fn main() {
     let addr: SocketAddrV4 = "127.0.0.1:8888".parse().unwrap();
-    let mut conn = RastaListener::new(addr, on_receive);
-    conn.listen();
+    let mut conn = RastaListener::try_new(addr).unwrap();
+    conn.listen(on_receive).unwrap();
 }
