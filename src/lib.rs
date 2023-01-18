@@ -1,6 +1,6 @@
 //#![no_std]
 
-use message::{Message, MessageType, RastaId};
+use message::{Message, MessageType, RastaId, RASTA_VERSION};
 
 pub mod message;
 pub mod sci;
@@ -8,22 +8,27 @@ pub mod sci;
 use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream, ToSocketAddrs},
+    time::{Duration, Instant},
 };
 
 const N_SENDMAX: u16 = u16::MAX;
-//const RASTA_TIMEOUT: u32 = 3;
+const RASTA_TIMEOUT_DURATION: Duration = Duration::from_millis(500);
 
 #[derive(Debug)]
 pub enum RastaError {
     InvalidSeqNr,
     Timeout,
+    VersionMismatch,
     IOError(std::io::Error),
     Other(String),
 }
 
 impl From<std::io::Error> for RastaError {
     fn from(value: std::io::Error) -> Self {
-        Self::IOError(value)
+        match value.kind() {
+            std::io::ErrorKind::TimedOut => Self::Timeout,
+            _ => Self::IOError(value),
+        }
     }
 }
 
@@ -43,8 +48,8 @@ pub enum RastaCommand<D: AsRef<[u8]>> {
 pub struct RastaListener {
     listener: TcpListener,
     connections: Vec<RastaId>,
-
-    seq_nr: u32,
+    seq_nr: Option<u32>,
+    last_message_timestamp: Option<Instant>,
 }
 
 impl RastaListener {
@@ -53,7 +58,8 @@ impl RastaListener {
         Ok(Self {
             listener,
             connections: Vec::new(),
-            seq_nr: 0,
+            seq_nr: None,
+            last_message_timestamp: None,
         })
     }
 
@@ -70,22 +76,45 @@ impl RastaListener {
     {
         for conn in self.listener.incoming() {
             let mut conn = conn.map_err(RastaError::from)?;
+            conn.set_read_timeout(Some(RASTA_TIMEOUT_DURATION))
+                .map_err(RastaError::from)?;
             println!(
                 "New connection: {}",
                 conn.peer_addr().map_err(RastaError::from)?
             );
             loop {
                 let mut buf = vec![0; 1024];
-                conn.read(&mut buf).map_err(RastaError::from)?;
+                if conn.read(&mut buf).is_err() {
+                    let c = self.connections.pop();
+                    println!("Client {} unexpectedly disconnected", c.unwrap());
+                    self.seq_nr = None;
+                    break;
+                }
                 let msg = Message::from(buf.as_slice());
                 dbg!(msg.message_type());
                 dbg!(msg.sequence_number());
                 dbg!(msg.confirmed_sequence_number());
                 dbg!(self.seq_nr);
-                if self.seq_nr != 0 && msg.confirmed_sequence_number() != self.seq_nr {
+                if self.seq_nr.is_some() && msg.confirmed_sequence_number() != self.seq_nr.unwrap()
+                {
                     return Err(RastaError::InvalidSeqNr);
                 }
-                self.seq_nr = msg.sequence_number();
+                if self.last_message_timestamp.is_some()
+                    && Instant::now().duration_since(self.last_message_timestamp.unwrap())
+                        > RASTA_TIMEOUT_DURATION
+                {
+                    let response = Message::disconnection_request(
+                        msg.sender(),
+                        msg.receiver(),
+                        msg.sequence_number() + 1,
+                        msg.sequence_number(),
+                        self.timestamp(),
+                        msg.timestamp(),
+                    );
+                    conn.write(&response).map_err(RastaError::from)?;
+                    break;
+                }
+                self.seq_nr.replace(msg.sequence_number());
                 match msg.message_type() {
                     MessageType::ConnReq => {
                         let resp = Message::connection_response(
@@ -97,7 +126,7 @@ impl RastaListener {
                             N_SENDMAX,
                         );
                         conn.write(&resp).map_err(RastaError::from)?;
-                        self.seq_nr = msg.sequence_number() + 1;
+                        self.seq_nr.replace(msg.sequence_number() + 1);
                         self.connections.push(msg.sender());
                     }
                     MessageType::ConnResp => {
@@ -115,11 +144,11 @@ impl RastaListener {
                     MessageType::HB => {
                         if self.connections.contains(&msg.sender()) {
                             println!("Heartbeat from {}", msg.sender());
-                            self.seq_nr = msg.sequence_number() + 1;
+                            self.seq_nr.replace(msg.sequence_number() + 1);
                             let response = Message::heartbeat(
                                 msg.sender(),
                                 msg.receiver(),
-                                self.seq_nr,
+                                self.seq_nr.unwrap(),
                                 msg.sequence_number(),
                                 self.timestamp(),
                                 msg.timestamp(),
@@ -153,6 +182,9 @@ pub struct RastaConnection {
 impl RastaConnection {
     pub fn try_new<S: ToSocketAddrs>(server: S, id: RastaId) -> Result<Self, RastaError> {
         let connection = TcpStream::connect(server).map_err(RastaError::from)?;
+        connection
+            .set_read_timeout(Some(RASTA_TIMEOUT_DURATION))
+            .map_err(RastaError::from)?;
         Ok(Self {
             state: RastaConnectionState::Closed,
             id,
@@ -181,6 +213,10 @@ impl RastaConnection {
         let mut buf = vec![0; 1024];
         self.server.read(&mut buf).map_err(RastaError::from)?;
         let response = Message::from(buf.as_slice());
+        let remote_version = &response.data()[0..4];
+        if remote_version != &RASTA_VERSION {
+            return Err(RastaError::VersionMismatch);
+        }
         if response.message_type() == MessageType::ConnResp {
             self.state = RastaConnectionState::Up;
             self.seq_nr = response.sequence_number();
@@ -266,7 +302,7 @@ impl RastaConnection {
                 }
                 RastaCommand::Wait => {
                     self.send_heartbeat()?;
-                    std::thread::sleep(std::time::Duration::from_secs(1));
+                    std::thread::sleep(RASTA_TIMEOUT_DURATION / 2);
                 }
                 RastaCommand::Disconnect => {
                     self.close_connection()?;

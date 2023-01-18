@@ -4,6 +4,8 @@ use crate::RastaError;
 
 pub type RastaId = u32;
 
+pub const RASTA_VERSION: [u8; 4] = [0x30, 0x33, 0x30, 0x31];
+
 pub struct Message {
     pub content: Vec<u8>,
     data_len: Option<usize>,
@@ -137,14 +139,19 @@ impl Message {
         n_sendmax: u16,
     ) -> Self {
         let mut data = [0; 14];
-        data[..4].copy_from_slice(&[0x30, 0x33, 0x30, 0x31]);
+        data[..4].copy_from_slice(&RASTA_VERSION);
         data[5..7].copy_from_slice(&n_sendmax.to_ne_bytes());
+        let initial_seq_nr = if cfg!(feature = "rand") {
+            rand::random()
+        } else {
+            4
+        };
         MessageBuilder::new()
             .length(50)
             .message_type(MessageType::ConnReq)
             .receiver(receiver)
             .sender(sender)
-            .sequence_number(4)
+            .sequence_number(initial_seq_nr)
             .confirmed_sequence_number(0)
             .timestamp(timestamp)
             .confirmed_timestamp(0)
@@ -162,7 +169,7 @@ impl Message {
         n_sendmax: u16,
     ) -> Self {
         let mut data = [0; 14];
-        data[..4].copy_from_slice(&[0x30, 0x33, 0x30, 0x31]);
+        data[..4].copy_from_slice(&RASTA_VERSION);
         data[5..7].copy_from_slice(&n_sendmax.to_ne_bytes());
         let sequence_number = confirmed_sequence_number + 1;
         MessageBuilder::new()
