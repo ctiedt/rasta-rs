@@ -16,7 +16,7 @@ fn main() {
         SCIPConnection::try_new(conn, "C".to_string(), sci_name_rasta_id_mapping).unwrap();
     let mut next_direction = SCIPointTargetLocation::PointLocationChangeToLeft;
     sender
-        .run(|data| {
+        .run("S", |data| {
             if let Some(data) = data {
                 dbg!(data.message_type);
                 if data.message_type == SCIMessageType::SCIPMessageTypeLocationStatus {

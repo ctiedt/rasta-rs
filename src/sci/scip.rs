@@ -148,10 +148,17 @@ impl SCIPConnection {
         SCITelegram::try_from(msg.data())
     }
 
-    pub fn run<F>(&mut self, mut telegram_fn: F) -> Result<(), RastaError>
+    pub fn run<F>(&mut self, peer: &str, mut telegram_fn: F) -> Result<(), RastaError>
     where
         F: FnMut(Option<SCITelegram>) -> SCICommand,
     {
+        if self.conn.connection_state_request() == RastaConnectionState::Down {
+            let receiver = self
+                .sci_name_rasta_id_mapping
+                .get(peer)
+                .ok_or(RastaError::Other("Missing Rasta ID".to_string()))?;
+            self.conn.open_connection(*receiver)?;
+        }
         let mut previous_data = None;
         loop {
             match telegram_fn(previous_data.take()) {

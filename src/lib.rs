@@ -11,8 +11,8 @@ use std::{
     time::{Duration, Instant},
 };
 
-const N_SENDMAX: u16 = u16::MAX;
-const RASTA_TIMEOUT_DURATION: Duration = Duration::from_millis(500);
+pub const N_SENDMAX: u16 = u16::MAX;
+pub const RASTA_TIMEOUT_DURATION: Duration = Duration::from_millis(500);
 
 #[derive(Debug)]
 pub enum RastaError {
@@ -88,14 +88,21 @@ impl RastaListener {
             );
             loop {
                 let mut buf = vec![0; 1024];
-                if conn.read(&mut buf).is_err() {
+                let conn_result = conn.read(&mut buf);
+                if conn_result.is_err() {
                     let c = self.connections.pop();
                     println!("Client {} unexpectedly disconnected", c.unwrap());
                     self.seq_nr = None;
                     break;
+                } else if conn_result.as_ref().unwrap() == &0 {
+                    println!("Invalid message received - aborting connection");
+                    self.seq_nr = None;
+                    break;
                 }
-                let msg = Message::from(buf.as_slice());
+                let msg = Message::from(&buf[..conn_result.unwrap()]);
                 dbg!(msg.message_type());
+                dbg!(msg.sender());
+                dbg!(msg.receiver());
                 dbg!(msg.sequence_number());
                 dbg!(msg.confirmed_sequence_number());
                 dbg!(self.seq_nr);
@@ -137,8 +144,8 @@ impl RastaListener {
                     MessageType::ConnResp => {
                         //Ignore
                     }
-                    MessageType::RetrReq => unimplemented!(),
-                    MessageType::RetrResp => unimplemented!(),
+                    MessageType::RetrReq => unimplemented!("Handled by TCP"),
+                    MessageType::RetrResp => unimplemented!("Handled by TCP"),
                     MessageType::DiscReq => {
                         if let Some(idx) = self.connections.iter().position(|c| *c == msg.sender())
                         {
@@ -203,7 +210,7 @@ pub struct RastaConnection {
     state: RastaConnectionState,
     id: RastaId,
     peer: RastaId,
-    seq_nr: u32,
+    seq_nr: Option<u32>,
     confirmed_timestamp: u32,
     server: TcpStream,
 }
@@ -218,15 +225,20 @@ impl RastaConnection {
             state: RastaConnectionState::Down,
             id,
             peer: 0,
-            seq_nr: 0,
+            seq_nr: None,
             confirmed_timestamp: 0,
             server: connection,
         })
     }
 
     fn next_seq_nr(&mut self) -> (u32, u32) {
-        self.seq_nr += 1;
-        (self.seq_nr - 1, self.seq_nr)
+        if let Some(seq_nr) = self.seq_nr {
+            self.seq_nr.replace(seq_nr + 1);
+            (seq_nr, seq_nr + 1)
+        } else {
+            self.seq_nr.replace(0);
+            (0, 1)
+        }
     }
 
     fn timestamp(&self) -> u32 {
@@ -237,6 +249,7 @@ impl RastaConnection {
     }
 
     pub fn open_connection(&mut self, receiver: u32) -> Result<(), RastaError> {
+        println!("Sending connection request to {receiver}");
         let msg = Message::connection_request(receiver, self.id, self.timestamp(), N_SENDMAX);
         self.server.write(&msg).map_err(RastaError::from)?;
         let response = self.receive_message()?;
@@ -246,7 +259,7 @@ impl RastaConnection {
         }
         if response.message_type() == MessageType::ConnResp {
             self.state = RastaConnectionState::Up;
-            self.seq_nr = response.sequence_number();
+            self.seq_nr.replace(response.sequence_number());
             self.confirmed_timestamp = response.timestamp();
             self.peer = response.sender();
             println!(
@@ -304,7 +317,7 @@ impl RastaConnection {
         self.server.write(&msg).map_err(RastaError::from)?;
         let response = self.receive_message()?;
         if response.message_type() == MessageType::HB {
-            self.seq_nr = response.sequence_number();
+            self.seq_nr.replace(response.sequence_number());
             self.confirmed_timestamp = response.timestamp();
         }
         Ok(())
@@ -316,8 +329,8 @@ impl RastaConnection {
 
     pub fn receive_message(&mut self) -> Result<Message, RastaError> {
         let mut buf = vec![0; 1024];
-        self.server.read(&mut buf).map_err(RastaError::from)?;
-        Ok(Message::from(buf.as_slice()))
+        let bytes_read = self.server.read(&mut buf).map_err(RastaError::from)?;
+        Ok(Message::from(&buf[..bytes_read]))
     }
 
     pub fn run<F, D>(&mut self, peer: RastaId, mut message_fn: F) -> Result<(), RastaError>
