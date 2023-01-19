@@ -14,7 +14,7 @@ pub struct Message {
 impl Default for Message {
     fn default() -> Self {
         Self {
-            content: vec![0; 50],
+            content: vec![0; 1024],
             data_len: None,
         }
     }
