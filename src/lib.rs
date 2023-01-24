@@ -1,4 +1,45 @@
-//#![no_std]
+//! # rasta-rs
+//!
+//! A simplified implementation of the Rail Safe Transport Application Protocol (RaSTA) in Rust.
+//! This implementation only provides very basic functionality, no redundancy and no
+//! explicit retransmission (since it is TCP-based).
+//!
+//! ## Example - Sending:
+//!
+//! ```rust
+//! let addr: SocketAddrV4 = "127.0.0.1:8888".parse()?;
+//! // Connect to receiver on localhost
+//! // using RaSTA ID 1234 for sender
+//! let mut conn = RastaConnection::try_new(addr, 1234)?;
+//! let mut sent = false;
+//! // Connect to receiver with ID 5678
+//! conn.run(5678, |data| {
+//!     // Data is Some() if a new message has been receiver
+//!     if !sent {
+//!         sent = true;
+//!         RastaCommand::Data(vec![1, 2, 3, 4])
+//!     } else {
+//!         if let Some(data) = data {
+//!             dbg!(data);
+//!         }
+//!         // RastaCommand controls the flow of messages
+//!         RastaCommand::Wait
+//!     }
+//! })?;
+//! ```
+//!
+//! ## Example - Receiving:
+//!
+//! ```rust
+//! let addr: SocketAddrV4 = "127.0.0.1:8888".parse()?;
+//! // Listen on localhost with RaSTA ID 5678
+//! let mut conn = RastaListener::try_new(addr, 5678)?;
+//! conn.listen(|msg| {
+//!     dbg!(msg.data());
+//!     // Return Some() to respond with data to message
+//!     Some(vec![5, 6, 7, 8])
+//! })?;
+//! ```
 
 use message::{Message, MessageType, RastaId, RASTA_VERSION};
 
@@ -11,7 +52,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// The maximum number of messages in a [`RastaConnection`] or [`RastaListener`] buffer.
 pub const N_SENDMAX: u16 = u16::MAX;
+/// The timeout duration for messages between a [`RastaConnection`] and [`RastaListener`].
 pub const RASTA_TIMEOUT_DURATION: Duration = Duration::from_millis(500);
 
 #[derive(Debug)]
@@ -33,6 +76,7 @@ impl From<std::io::Error> for RastaError {
     }
 }
 
+/// The State of a RaSTA connection as defined in the specification.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum RastaConnectionState {
     Closed,
@@ -40,12 +84,25 @@ pub enum RastaConnectionState {
     Start,
     Up,
 }
+
+/// The control flow in a RaSTA connection.
+/// Determines which messages a [`RastaConnection`]
+/// should send.
 pub enum RastaCommand<D: AsRef<[u8]>> {
+    /// Send a data messages constructed from the passed buffer.
     Data(D),
+    /// Do not send any data, but maintain the connection. Sends a Heartbeat.
     Wait,
+    /// Terminate the connection.
     Disconnect,
 }
 
+/// This type roughly corresponds to [`std::net::TcpListener`].
+/// Create it using [`RastaListener::try_new`] and then handle
+/// messages using [`RastaListener::listen`]. Alternatively, you
+/// can manage the connection yourself. If you want to do this,
+/// look at the implementation of [`RastaListener::listen`] for
+/// inspiration.
 pub struct RastaListener {
     listener: TcpListener,
     connections: Vec<RastaId>,
@@ -206,6 +263,12 @@ impl RastaListener {
     }
 }
 
+/// This type roughly corresponds to [`std::net::TcpStream`].
+/// Create it using [`RastaConnection::try_new`] and then handle
+/// messages using [`RastaConnection::run`]. Alternatively, you
+/// can manage the connection yourself. If you want to do this,
+/// look at the implementation of [`RastaConnection::run`] for
+/// inspiration.
 pub struct RastaConnection {
     state: RastaConnectionState,
     id: RastaId,

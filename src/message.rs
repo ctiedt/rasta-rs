@@ -4,8 +4,13 @@ use crate::RastaError;
 
 pub type RastaId = u32;
 
+/// The current RaSTA version as defined by the standard.
 pub const RASTA_VERSION: [u8; 4] = [0x30, 0x33, 0x30, 0x31];
 
+/// The RaSTA message type. Messages are a thin wrapper around
+/// byte arrays. You should never have to construct messages by hand,
+/// instead using the associated functions on [`Message`] or
+/// the [`MessageBuilder`] type.
 pub struct Message {
     pub content: Vec<u8>,
     data_len: Option<usize>,
