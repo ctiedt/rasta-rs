@@ -16,7 +16,10 @@ fn main() {
     let mut location = SCIPointLocation::PointLocationLeft;
     receiver
         .listen(|telegram| {
-            println!("Received Telegram: {:?}", telegram.message_type);
+            println!(
+                "Received Telegram: {}",
+                telegram.message_type.try_as_scip_message_type().unwrap()
+            );
             dbg!(telegram.sender);
             dbg!(telegram.receiver);
             dbg!(telegram.payload.used);

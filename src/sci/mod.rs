@@ -77,6 +77,36 @@ impl SCIMessageType {
     pub const fn sci_timeout() -> Self {
         Self(0x000C)
     }
+
+    pub fn try_as_sci_message_type(&self) -> Result<&str, RastaError> {
+        match self.0 {
+            0x0024 => Ok("VersionRequest"),
+            0x0025 => Ok("VersionResponse"),
+            0x0021 => Ok("StatusRequest"),
+            0x0022 => Ok("StatusBegin"),
+            0x0023 => Ok("StatusFinish"),
+            0x000C => Ok("Timeout"),
+            v => Err(RastaError::Other(format!("Not an SCI message type: `{v}`"))),
+        }
+    }
+
+    pub fn try_as_scip_message_type(&self) -> Result<&str, RastaError> {
+        match self.0 {
+            0x0001 => Ok("ChangeLocation"),
+            0x000B => Ok("LocationStatus"),
+            _ => self.try_as_sci_message_type(),
+        }
+    }
+
+    pub fn try_as_scils_message_type(&self) -> Result<&str, RastaError> {
+        match self.0 {
+            0x0001 => Ok("ShowSignalAspect"),
+            0x0002 => Ok("ChangeBrightness"),
+            0x0003 => Ok("SignalAspectStatus"),
+            0x0004 => Ok("BrightnessStatus"),
+            _ => self.try_as_sci_message_type(),
+        }
+    }
 }
 
 impl Into<u8> for SCIMessageType {
