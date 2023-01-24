@@ -20,7 +20,7 @@ fn main() {
             dbg!(telegram.sender);
             dbg!(telegram.receiver);
             dbg!(telegram.payload.used);
-            if telegram.message_type == SCIMessageType::SCIPMessageTypeChangeLocation {
+            if telegram.message_type == SCIMessageType::ChangeLocation {
                 let change = SCIPointTargetLocation::try_from(telegram.payload.data[0]).unwrap();
                 match change {
                     SCIPointTargetLocation::PointLocationChangeToRight => {

@@ -55,7 +55,7 @@ impl SCITelegram {
     pub fn change_location(sender: &str, receiver: &str, to: SCIPointTargetLocation) -> Self {
         Self {
             protocol_type: ProtocolType::SCIProtocolP,
-            message_type: SCIMessageType::SCIPMessageTypeChangeLocation,
+            message_type: SCIMessageType::ChangeLocation,
             sender: sender.to_string(),
             receiver: receiver.to_string(),
             payload: SCIPayload::from_slice(&[to as u8]),
@@ -65,7 +65,7 @@ impl SCITelegram {
     pub fn location_status(sender: &str, receiver: &str, location: SCIPointLocation) -> Self {
         Self {
             protocol_type: ProtocolType::SCIProtocolP,
-            message_type: SCIMessageType::SCIPMessageTypeLocationStatus,
+            message_type: SCIMessageType::LocationStatus,
             sender: sender.to_string(),
             receiver: receiver.to_string(),
             payload: SCIPayload::from_slice(&[location as u8]),
@@ -75,7 +75,7 @@ impl SCITelegram {
     pub fn timeout(sender: &str, receiver: &str) -> Self {
         Self {
             protocol_type: ProtocolType::SCIProtocolP,
-            message_type: SCIMessageType::SCIPMessageTypeTimeout,
+            message_type: SCIMessageType::Timeout,
             sender: sender.to_string(),
             receiver: receiver.to_string(),
             payload: SCIPayload::default(),
@@ -91,6 +91,10 @@ pub struct SCIPListener {
 impl SCIPListener {
     pub fn new(listener: RastaListener, name: String) -> Self {
         Self { listener, name }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     pub fn listen<F>(&mut self, mut on_receive: F) -> Result<(), RastaError>
@@ -128,6 +132,10 @@ impl SCIPConnection {
         } else {
             Err(RastaError::StateError)
         }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     pub fn send_telegram(&mut self, telegram: SCITelegram) -> Result<(), RastaError> {

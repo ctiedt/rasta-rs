@@ -19,7 +19,7 @@ fn main() {
         .run("S", |data| {
             if let Some(data) = data {
                 dbg!(data.message_type);
-                if data.message_type == SCIMessageType::SCIPMessageTypeLocationStatus {
+                if data.message_type == SCIMessageType::LocationStatus {
                     let location = SCIPointLocation::try_from(data.payload.data[0]).unwrap();
                     println!("Point is now at {location:?}");
                     next_direction = if location == SCIPointLocation::PointLocationLeft {

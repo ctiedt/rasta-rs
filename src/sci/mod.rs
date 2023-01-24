@@ -2,6 +2,8 @@ use crate::RastaError;
 
 pub mod scip;
 
+pub const SCI_VERSION: u8 = 0x01;
+
 pub(crate) fn str_to_sci_name(name: &str) -> Vec<u8> {
     let mut new_name = vec!['_' as u8; 20];
     if name.len() < 20 {
@@ -32,9 +34,37 @@ impl TryFrom<u8> for ProtocolType {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SCIMessageType {
-    SCIPMessageTypeChangeLocation = 0x0001,
-    SCIPMessageTypeLocationStatus = 0x000B,
-    SCIPMessageTypeTimeout = 0x000C,
+    VersionRequest = 0x0024,
+    VersionResponse = 0x0025,
+    StatusRequest = 0x0021,
+    StatusBegin = 0x0022,
+    StatusFinish = 0x0023,
+    ChangeLocation = 0x0001,
+    LocationStatus = 0x000B,
+    Timeout = 0x000C,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum SCIVersionCheckResult {
+    NotAllowedToUse = 0,
+    VersionsAreNotEqual = 1,
+    VersionsAreEqual = 2,
+}
+
+impl TryFrom<u8> for SCIVersionCheckResult {
+    type Error = RastaError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::NotAllowedToUse),
+            1 => Ok(Self::VersionsAreEqual),
+            2 => Ok(Self::VersionsAreEqual),
+            v => Err(RastaError::Other(format!(
+                "Unknown SCI Version check result `{v:x}`"
+            ))),
+        }
+    }
 }
 
 impl TryFrom<u8> for SCIMessageType {
@@ -42,9 +72,9 @@ impl TryFrom<u8> for SCIMessageType {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0x0001 => Ok(Self::SCIPMessageTypeChangeLocation),
-            0x000B => Ok(Self::SCIPMessageTypeLocationStatus),
-            0x000C => Ok(Self::SCIPMessageTypeTimeout),
+            0x0001 => Ok(Self::ChangeLocation),
+            0x000B => Ok(Self::LocationStatus),
+            0x000C => Ok(Self::Timeout),
             v => Err(RastaError::Other(format!("Unknown SCI message `{v}`"))),
         }
     }
@@ -79,6 +109,72 @@ pub struct SCITelegram {
     pub sender: String,
     pub receiver: String,
     pub payload: SCIPayload,
+}
+
+impl SCITelegram {
+    pub fn version_request(
+        protocol_type: ProtocolType,
+        sender: &str,
+        receiver: &str,
+        version: u8,
+    ) -> Self {
+        Self {
+            protocol_type,
+            message_type: SCIMessageType::VersionRequest,
+            sender: sender.to_string(),
+            receiver: receiver.to_string(),
+            payload: SCIPayload::from_slice(&[version]),
+        }
+    }
+
+    pub fn version_response(
+        protocol_type: ProtocolType,
+        sender: &str,
+        receiver: &str,
+        version: u8,
+        version_check_result: SCIVersionCheckResult,
+        checksum: &[u8],
+    ) -> Self {
+        let mut payload_data = vec![version_check_result as u8, version, checksum.len() as u8];
+        payload_data.append(&mut Vec::from(checksum));
+        Self {
+            protocol_type,
+            message_type: SCIMessageType::VersionResponse,
+            sender: sender.to_string(),
+            receiver: receiver.to_string(),
+            payload: SCIPayload::from_slice(&payload_data),
+        }
+    }
+
+    pub fn status_request(protocol_type: ProtocolType, sender: &str, receiver: &str) -> Self {
+        Self {
+            protocol_type,
+            message_type: SCIMessageType::StatusRequest,
+            sender: sender.to_string(),
+            receiver: receiver.to_string(),
+            payload: SCIPayload::default(),
+        }
+    }
+
+    pub fn status_begin(protocol_type: ProtocolType, sender: &str, receiver: &str) -> Self {
+        Self {
+            protocol_type,
+            message_type: SCIMessageType::StatusBegin,
+            sender: sender.to_string(),
+            receiver: receiver.to_string(),
+            payload: SCIPayload::default(),
+        }
+    }
+
+    pub fn status_finish(protocol_type: ProtocolType, sender: &str, receiver: &str) -> Self {
+        Self {
+            protocol_type,
+            message_type: SCIMessageType::StatusFinish,
+            sender: sender.to_string(),
+            receiver: receiver.to_string(),
+            payload: SCIPayload::default(),
+        }
+    }
 }
 
 impl TryFrom<&[u8]> for SCITelegram {
