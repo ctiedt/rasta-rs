@@ -25,7 +25,7 @@ impl SCIMessageType {
 }
 
 /// The possible aspects of a main signal
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 #[repr(u8)]
 pub enum SCILSMain {
     Hp0 = 0x01,
@@ -80,7 +80,7 @@ impl TryFrom<u8> for SCILSMain {
 /// The possible types of an additional signal
 /// (excluding Zs2(v) and Zs3(v) which can show
 /// additional information and are listed separately)
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 #[repr(u8)]
 pub enum SCILSAdditional {
     Zs1 = 0x01,
@@ -111,7 +111,7 @@ impl TryFrom<u8> for SCILSAdditional {
 }
 
 /// Possible aspects for Zs3 and Zs3v signals
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 #[repr(u8)]
 pub enum SCILSZs3 {
     Index1 = 0x01,
@@ -162,7 +162,7 @@ impl TryFrom<u8> for SCILSZs3 {
 }
 
 /// Possible aspects for Zs2 and Zs2v signals
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 #[repr(u8)]
 pub enum SCILSZs2 {
     LetterA = 0x01,
@@ -234,7 +234,7 @@ impl TryFrom<u8> for SCILSZs2 {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 #[repr(u8)]
 pub enum SCILSDepreciationInformation {
     Type1 = 0x01,
@@ -260,7 +260,7 @@ impl TryFrom<u8> for SCILSDepreciationInformation {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 #[repr(u8)]
 pub enum SCILSDrivewayInformation {
     Way1 = 0x1,
@@ -288,7 +288,7 @@ impl TryFrom<u8> for SCILSDrivewayInformation {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 #[repr(u8)]
 pub enum SCILSDarkSwitching {
     #[default]
@@ -308,6 +308,7 @@ impl TryFrom<u8> for SCILSDarkSwitching {
     }
 }
 
+#[derive(Clone, Copy)]
 #[repr(u8)]
 pub enum SCILSBrightness {
     Day = 0x01,
@@ -328,6 +329,7 @@ impl TryFrom<u8> for SCILSBrightness {
     }
 }
 
+#[derive(Clone)]
 /// A complete signal aspect.
 pub struct SCILSSignalAspect {
     main: SCILSMain,
@@ -372,44 +374,44 @@ impl SCILSSignalAspect {
         }
     }
 
-    pub fn main(&self) -> &SCILSMain {
-        &self.main
+    pub fn main(&self) -> SCILSMain {
+        self.main
     }
 
-    pub fn additional(&self) -> &SCILSAdditional {
-        &self.additional
+    pub fn additional(&self) -> SCILSAdditional {
+        self.additional
     }
 
-    pub fn zs3(&self) -> &SCILSZs3 {
-        &self.zs3
+    pub fn zs3(&self) -> SCILSZs3 {
+        self.zs3
     }
 
-    pub fn zs3v(&self) -> &SCILSZs3 {
-        &self.zs3v
+    pub fn zs3v(&self) -> SCILSZs3 {
+        self.zs3v
     }
 
-    pub fn zs2(&self) -> &SCILSZs2 {
-        &self.zs2
+    pub fn zs2(&self) -> SCILSZs2 {
+        self.zs2
     }
 
-    pub fn zs2v(&self) -> &SCILSZs2 {
-        &self.zs2v
+    pub fn zs2v(&self) -> SCILSZs2 {
+        self.zs2v
     }
 
-    pub fn depreciation_information(&self) -> &SCILSDepreciationInformation {
-        &self.depreciation_information
+    pub fn depreciation_information(&self) -> SCILSDepreciationInformation {
+        self.depreciation_information
     }
 
-    pub fn upstream_driveway_information(&self) -> &SCILSDrivewayInformation {
-        &self.upstream_driveway_information
+    pub fn upstream_driveway_information(&self) -> SCILSDrivewayInformation {
+        self.upstream_driveway_information
     }
 
-    pub fn downstream_driveway_information(&self) -> &SCILSDrivewayInformation {
-        &self.downstream_driveway_information
+    pub fn downstream_driveway_information(&self) -> SCILSDrivewayInformation {
+        self.downstream_driveway_information
     }
 
-    pub fn dark_switching(&self) -> &SCILSDarkSwitching {
-        &self.dark_switching
+    pub fn dark_switching(&self) -> SCILSDarkSwitching {
+        self.dark_switching
     }
 
     pub fn nationally_specified_information(&self) -> &[u8] {
