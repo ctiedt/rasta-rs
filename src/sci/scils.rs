@@ -392,6 +392,39 @@ impl From<SCILSSignalAspect> for SCIPayload {
     }
 }
 
+impl TryFrom<&[u8]> for SCILSSignalAspect {
+    type Error = RastaError;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        let main = SCILSMain::try_from(value[0])?;
+        let additional = SCILSAdditional::try_from(value[1])?;
+        let zs3 = SCILSZs3::try_from(value[2])?;
+        let zs3v = SCILSZs3::try_from(value[3])?;
+        let zs2 = SCILSZs2::try_from(value[4])?;
+        let zs2v = SCILSZs2::try_from(value[5])?;
+        let depreciation_information = SCILSDepreciationInformation::try_from(value[6])?;
+        let downstream_driveway_information =
+            SCILSDrivewayInformation::try_from((value[7] & 0xF0) >> 4)?;
+        let upstream_driveway_information = SCILSDrivewayInformation::try_from(value[7] & 0x0F)?;
+        let dark_switching = SCILSDarkSwitching::try_from(value[8])?;
+        let mut nationally_specified_information = [0; 9];
+        nationally_specified_information[..].copy_from_slice(&value[9..18]);
+        Ok(Self {
+            main,
+            additional,
+            zs3,
+            zs3v,
+            zs2,
+            zs2v,
+            depreciation_information,
+            upstream_driveway_information,
+            downstream_driveway_information,
+            dark_switching,
+            nationally_specified_information,
+        })
+    }
+}
+
 impl SCITelegram {
     pub fn scils_show_signal_aspect(
         sender: &str,
