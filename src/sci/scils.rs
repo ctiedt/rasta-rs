@@ -371,6 +371,50 @@ impl SCILSSignalAspect {
             nationally_specified_information,
         }
     }
+
+    pub fn main(&self) -> &SCILSMain {
+        &self.main
+    }
+
+    pub fn additional(&self) -> &SCILSAdditional {
+        &self.additional
+    }
+
+    pub fn zs3(&self) -> &SCILSZs3 {
+        &self.zs3
+    }
+
+    pub fn zs3v(&self) -> &SCILSZs3 {
+        &self.zs3v
+    }
+
+    pub fn zs2(&self) -> &SCILSZs2 {
+        &self.zs2
+    }
+
+    pub fn zs2v(&self) -> &SCILSZs2 {
+        &self.zs2v
+    }
+
+    pub fn depreciation_information(&self) -> &SCILSDepreciationInformation {
+        &self.depreciation_information
+    }
+
+    pub fn upstream_driveway_information(&self) -> &SCILSDrivewayInformation {
+        &self.upstream_driveway_information
+    }
+
+    pub fn downstream_driveway_information(&self) -> &SCILSDrivewayInformation {
+        &self.downstream_driveway_information
+    }
+
+    pub fn dark_switching(&self) -> &SCILSDarkSwitching {
+        &self.dark_switching
+    }
+
+    pub fn nationally_specified_information(&self) -> &[u8] {
+        &self.nationally_specified_information
+    }
 }
 
 impl From<SCILSSignalAspect> for SCIPayload {
