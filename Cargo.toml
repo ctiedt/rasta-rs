@@ -9,6 +9,7 @@ crate-type = ["cdylib", "rlib"]
 [features]
 default = ["rand"]
 rand = ["dep:rand"]
+wasi_sockets = []
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

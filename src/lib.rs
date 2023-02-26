@@ -47,10 +47,13 @@ pub mod message;
 pub mod sci;
 
 use std::{
-    io::{Read, Write},
+    io::{ErrorKind, Read, Write},
     net::{TcpListener, TcpStream, ToSocketAddrs},
     time::{Duration, Instant},
 };
+
+#[cfg(feature = "wasi_sockets")]
+use std::os::wasi::io::FromRawFd;
 
 /// The maximum number of messages in a [`RastaConnection`] or [`RastaListener`] buffer.
 pub const N_SENDMAX: u16 = u16::MAX;
@@ -113,6 +116,9 @@ pub struct RastaListener {
 
 impl RastaListener {
     pub fn try_new<S: ToSocketAddrs>(addr: S, id: RastaId) -> Result<Self, RastaError> {
+        #[cfg(feature = "wasi_sockets")]
+        let listener = unsafe { TcpListener::from_raw_fd(3) };
+        #[cfg(not(feature = "wasi_sockets"))]
         let listener = TcpListener::bind(addr).map_err(RastaError::from)?;
         Ok(Self {
             listener,
@@ -136,13 +142,22 @@ impl RastaListener {
         D: AsRef<[u8]>,
     {
         for conn in self.listener.incoming() {
+            if let Err(e) = &conn {
+                if e.kind() == ErrorKind::WouldBlock {
+                    continue;
+                }
+            }
             let mut conn = conn.map_err(RastaError::from)?;
+            #[cfg(not(feature = "wasi_sockets"))]
             conn.set_read_timeout(Some(RASTA_TIMEOUT_DURATION))
                 .map_err(RastaError::from)?;
+            #[cfg(not(feature = "wasi_sockets"))]
             println!(
                 "New connection: {}",
                 conn.peer_addr().map_err(RastaError::from)?
             );
+            #[cfg(feature = "wasi_sockets")]
+            println!("New connection!");
             loop {
                 let mut buf = vec![0; 1024];
                 let conn_result = conn.read(&mut buf);
