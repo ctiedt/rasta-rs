@@ -4,12 +4,31 @@
 //! to communicate with track elements such as points and signals.
 //! `rasta-rs` provides support for SCI-P at the moment.
 
+#[cfg(feature = "rasta")]
 use std::collections::HashMap;
 
-use crate::{
+#[cfg(feature = "rasta")]
+use rasta_rs::{
     message::RastaId, RastaConnection, RastaConnectionState, RastaError, RastaListener,
     RASTA_TIMEOUT_DURATION,
 };
+use scils::SciLsError;
+use scip::SciPError;
+
+#[derive(Debug, Clone)]
+pub enum SciError {
+    UnknownProtocol(u8),
+    UnknownMessageType(u8),
+    UnknownVersionCheckResult(u8),
+    Ls(SciLsError),
+    P(SciPError),
+}
+
+impl From<SciLsError> for SciError {
+    fn from(value: SciLsError) -> Self {
+        SciError::Ls(value)
+    }
+}
 
 pub mod scils;
 pub mod scip;
@@ -18,7 +37,7 @@ pub mod scip;
 pub const SCI_VERSION: u8 = 0x01;
 
 pub(crate) fn str_to_sci_name(name: &str) -> Vec<u8> {
-    let mut new_name = vec!['_' as u8; 20];
+    let mut new_name = vec![b'_'; 20];
     if name.len() < 20 {
         new_name[..name.len()].clone_from_slice(name.as_bytes());
     } else {
@@ -29,19 +48,20 @@ pub(crate) fn str_to_sci_name(name: &str) -> Vec<u8> {
 
 /// Constants to represent SCI Protocol types.
 #[repr(u8)]
+#[derive(Clone, Copy)]
 pub enum ProtocolType {
     SCIProtocolP = 0x40,
     SCIProtocolLS = 0x30,
 }
 
 impl TryFrom<u8> for ProtocolType {
-    type Error = RastaError;
+    type Error = SciError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             0x40 => Ok(Self::SCIProtocolP),
             0x30 => Ok(Self::SCIProtocolLS),
-            v => Err(RastaError::Other(format!("Unknown SCI protocol `{v}`"))),
+            v => Err(SciError::UnknownProtocol(v)),
         }
     }
 }
@@ -78,7 +98,7 @@ impl SCIMessageType {
         Self(0x000C)
     }
 
-    pub fn try_as_sci_message_type(&self) -> Result<&str, RastaError> {
+    pub fn try_as_sci_message_type(&self) -> Result<&str, SciError> {
         match self.0 {
             0x0024 => Ok("VersionRequest"),
             0x0025 => Ok("VersionResponse"),
@@ -86,11 +106,11 @@ impl SCIMessageType {
             0x0022 => Ok("StatusBegin"),
             0x0023 => Ok("StatusFinish"),
             0x000C => Ok("Timeout"),
-            v => Err(RastaError::Other(format!("Not an SCI message type: `{v}`"))),
+            v => Err(SciError::UnknownMessageType(v)),
         }
     }
 
-    pub fn try_as_scip_message_type(&self) -> Result<&str, RastaError> {
+    pub fn try_as_scip_message_type(&self) -> Result<&str, SciError> {
         match self.0 {
             0x0001 => Ok("ChangeLocation"),
             0x000B => Ok("LocationStatus"),
@@ -98,7 +118,7 @@ impl SCIMessageType {
         }
     }
 
-    pub fn try_as_scils_message_type(&self) -> Result<&str, RastaError> {
+    pub fn try_as_scils_message_type(&self) -> Result<&str, SciError> {
         match self.0 {
             0x0001 => Ok("ShowSignalAspect"),
             0x0002 => Ok("ChangeBrightness"),
@@ -109,9 +129,9 @@ impl SCIMessageType {
     }
 }
 
-impl Into<u8> for SCIMessageType {
-    fn into(self) -> u8 {
-        self.0
+impl From<SCIMessageType> for u8 {
+    fn from(val: SCIMessageType) -> Self {
+        val.0
     }
 }
 
@@ -124,35 +144,34 @@ pub enum SCIVersionCheckResult {
 }
 
 impl TryFrom<u8> for SCIVersionCheckResult {
-    type Error = RastaError;
+    type Error = SciError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(Self::NotAllowedToUse),
             1 => Ok(Self::VersionsAreEqual),
             2 => Ok(Self::VersionsAreEqual),
-            v => Err(RastaError::Other(format!(
-                "Unknown SCI Version check result `{v:x}`"
-            ))),
+            v => Err(SciError::UnknownVersionCheckResult(v)),
         }
     }
 }
 
 impl TryFrom<u8> for SCIMessageType {
-    type Error = RastaError;
+    type Error = SciError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             0x0001 => Ok(Self::scip_change_location()),
             0x000B => Ok(Self::scip_location_status()),
             0x000C => Ok(Self::sci_timeout()),
-            v => Err(RastaError::Other(format!("Unknown SCI message `{v}`"))),
+            v => Err(SciError::UnknownMessageType(v)),
         }
     }
 }
 
 /// The payload of an [`SCITelegram`]. Usually constructed from
 /// a slice using [`SCIPayload::from_slice`].
+#[derive(Clone, Copy)]
 pub struct SCIPayload {
     pub data: [u8; 85],
     pub used: usize,
@@ -169,8 +188,10 @@ impl Default for SCIPayload {
 
 impl SCIPayload {
     fn from_slice(data: &[u8]) -> Self {
-        let mut payload = Self::default();
-        payload.used = data.len();
+        let mut payload = Self {
+            used: data.len(),
+            ..Default::default()
+        };
         payload.data[..data.len()].copy_from_slice(data);
         payload
     }
@@ -178,6 +199,7 @@ impl SCIPayload {
 
 /// An SCI message. You should construct these using the generic
 /// and protocol-specific associated functions.
+#[derive(Clone)]
 pub struct SCITelegram {
     pub protocol_type: ProtocolType,
     pub message_type: SCIMessageType,
@@ -263,7 +285,7 @@ impl SCITelegram {
 }
 
 impl TryFrom<&[u8]> for SCITelegram {
-    type Error = RastaError;
+    type Error = SciError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         Ok(Self {
@@ -276,13 +298,13 @@ impl TryFrom<&[u8]> for SCITelegram {
     }
 }
 
-impl Into<Vec<u8>> for SCITelegram {
-    fn into(self) -> Vec<u8> {
-        let mut data = vec![self.protocol_type as u8, self.message_type.into()];
-        data.append(&mut str_to_sci_name(&self.sender));
-        data.append(&mut str_to_sci_name(&self.receiver));
-        if self.payload.used > 0 {
-            let mut payload = Vec::from(self.payload.data);
+impl From<SCITelegram> for Vec<u8> {
+    fn from(val: SCITelegram) -> Self {
+        let mut data = vec![val.protocol_type as u8, val.message_type.into()];
+        data.append(&mut str_to_sci_name(&val.sender));
+        data.append(&mut str_to_sci_name(&val.receiver));
+        if val.payload.used > 0 {
+            let mut payload = Vec::from(val.payload.data);
             data.append(&mut payload);
         }
         data
@@ -290,6 +312,8 @@ impl Into<Vec<u8>> for SCITelegram {
 }
 
 /// The SCI equivalent of [`crate::RastaCommand`].
+#[cfg(feature = "rasta")]
+#[derive(Clone)]
 pub enum SCICommand {
     Telegram(SCITelegram),
     Wait,
@@ -299,11 +323,13 @@ pub enum SCICommand {
 /// A listening SCI endpoint built on top of [`RastaListener`].
 /// [`SCIPListener::listen`] follows the same conventions as
 /// [`RastaListener::listen`].
+#[cfg(feature = "rasta")]
 pub struct SCIListener {
     listener: RastaListener,
     name: String,
 }
 
+#[cfg(feature = "rasta")]
 impl SCIListener {
     pub fn new(listener: RastaListener, name: String) -> Self {
         Self { listener, name }
@@ -332,11 +358,14 @@ impl SCIListener {
 /// [`SCIPConnection::run`] follows the same conventions as
 /// [`RastaConnection::run`] but using the [`SCICommand`] type
 /// for control flow.
+#[cfg(feature = "rasta")]
 pub struct SCIConnection {
     conn: RastaConnection,
     name: String,
     sci_name_rasta_id_mapping: HashMap<String, RastaId>,
 }
+
+#[cfg(feature = "rasta")]
 impl SCIConnection {
     pub fn try_new(
         conn: RastaConnection,

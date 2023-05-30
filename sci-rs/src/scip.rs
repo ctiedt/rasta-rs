@@ -2,7 +2,19 @@
 //!
 //! The Standard Communication Interface for points.
 
-use crate::RastaError;
+#[derive(Debug, Clone, Copy)]
+pub enum SciPError {
+    UnknownTargetLocation(u8),
+    UnknownLocation(u8),
+}
+
+impl From<SciPError> for SciError {
+    fn from(value: SciPError) -> Self {
+        SciError::P(value)
+    }
+}
+
+use crate::SciError;
 
 use super::{ProtocolType, SCIMessageType, SCIPayload, SCITelegram};
 
@@ -25,15 +37,13 @@ pub enum SCIPointTargetLocation {
 }
 
 impl TryFrom<u8> for SCIPointTargetLocation {
-    type Error = RastaError;
+    type Error = SciError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             0x01 => Ok(Self::PointLocationChangeToRight),
             0x02 => Ok(Self::PointLocationChangeToLeft),
-            v => Err(RastaError::Other(format!(
-                "Unknown SCIP target location: {v}"
-            ))),
+            v => Err(SciPError::UnknownTargetLocation(v).into()),
         }
     }
 }
@@ -51,7 +61,7 @@ pub enum SCIPointLocation {
 }
 
 impl TryFrom<u8> for SCIPointLocation {
-    type Error = RastaError;
+    type Error = SciError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
@@ -59,7 +69,7 @@ impl TryFrom<u8> for SCIPointLocation {
             0x02 => Ok(Self::PointLocationLeft),
             0x03 => Ok(Self::PointNoTargetLocation),
             0x04 => Ok(Self::PointBumped),
-            v => Err(RastaError::Other(format!("Unknown SCIP location: {v}"))),
+            v => Err(SciPError::UnknownLocation(v).into()),
         }
     }
 }

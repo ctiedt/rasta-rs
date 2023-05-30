@@ -44,7 +44,6 @@
 use message::{Message, MessageType, RastaId, RASTA_VERSION};
 
 pub mod message;
-pub mod sci;
 
 use std::{
     io::{ErrorKind, Read, Write},
@@ -332,7 +331,7 @@ impl RastaConnection {
         self.server.write(&msg).map_err(RastaError::from)?;
         let response = self.receive_message()?;
         let remote_version = &response.data()[0..4];
-        if remote_version != &RASTA_VERSION {
+        if remote_version != RASTA_VERSION {
             return Err(RastaError::VersionMismatch);
         }
         if response.message_type() == MessageType::ConnResp {

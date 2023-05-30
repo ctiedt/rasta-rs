@@ -2,7 +2,19 @@
 //!
 //! The Standard Communication Interface for light signals.
 
-use crate::RastaError;
+#[derive(Debug, Clone, Copy)]
+pub enum SciLsError {
+    InvalidMainSignalAspect(u8),
+    InvalidAdditionalSignalAspect(u8),
+    InvalidZs2Aspect(u8),
+    InvalidZs3Aspect(u8),
+    InvalidDepreciationInformation(u8),
+    InvalidDrivewayInformation(u8),
+    InvalidDarkSwitching(u8),
+    InvalidBrightness(u8),
+}
+
+use crate::SciError;
 
 use super::{ProtocolType, SCIMessageType, SCIPayload, SCITelegram};
 
@@ -49,7 +61,7 @@ pub enum SCILSMain {
 }
 
 impl TryFrom<u8> for SCILSMain {
-    type Error = RastaError;
+    type Error = SciError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
@@ -70,9 +82,7 @@ impl TryFrom<u8> for SCILSMain {
             0xB1 => Ok(Self::Vr1),
             0xB2 => Ok(Self::Vr2),
             0xFF => Ok(Self::Off),
-            v => Err(RastaError::Other(format!(
-                "Invalid main signal aspect `{v}`"
-            ))),
+            v => Err(SciLsError::InvalidMainSignalAspect(v).into()),
         }
     }
 }
@@ -93,7 +103,7 @@ pub enum SCILSAdditional {
 }
 
 impl TryFrom<u8> for SCILSAdditional {
-    type Error = RastaError;
+    type Error = SciError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
@@ -103,9 +113,7 @@ impl TryFrom<u8> for SCILSAdditional {
             0x04 => Ok(Self::Zs6),
             0x05 => Ok(Self::Zs13),
             0xFF => Ok(Self::Off),
-            v => Err(RastaError::Other(format!(
-                "Invalid additional signal aspect `{v}`"
-            ))),
+            v => Err(SciLsError::InvalidAdditionalSignalAspect(v).into()),
         }
     }
 }
@@ -134,7 +142,7 @@ pub enum SCILSZs3 {
 }
 
 impl TryFrom<u8> for SCILSZs3 {
-    type Error = RastaError;
+    type Error = SciError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
@@ -154,9 +162,7 @@ impl TryFrom<u8> for SCILSZs3 {
             0x0E => Ok(Self::Index14),
             0x0F => Ok(Self::Index15),
             0xFF => Ok(Self::Off),
-            v => Err(RastaError::Other(format!(
-                "Invalid Zs3 signal aspect `{v}`"
-            ))),
+            v => Err(SciLsError::InvalidZs3Aspect(v).into()),
         }
     }
 }
@@ -196,7 +202,7 @@ pub enum SCILSZs2 {
 }
 
 impl TryFrom<u8> for SCILSZs2 {
-    type Error = RastaError;
+    type Error = SciError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
@@ -227,9 +233,7 @@ impl TryFrom<u8> for SCILSZs2 {
             0x19 => Ok(Self::LetterY),
             0x1A => Ok(Self::LetterZ),
             0xFF => Ok(Self::Off),
-            v => Err(RastaError::Other(format!(
-                "Invalid Zs2 signal aspect `{v}`"
-            ))),
+            v => Err(SciLsError::InvalidZs2Aspect(v).into()),
         }
     }
 }
@@ -245,7 +249,7 @@ pub enum SCILSDepreciationInformation {
 }
 
 impl TryFrom<u8> for SCILSDepreciationInformation {
-    type Error = RastaError;
+    type Error = SciError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
@@ -253,9 +257,7 @@ impl TryFrom<u8> for SCILSDepreciationInformation {
             0x02 => Ok(Self::Type2),
             0x03 => Ok(Self::Type3),
             0xFF => Ok(Self::NoInformation),
-            v => Err(RastaError::Other(format!(
-                "Invalid depreciation information `{v}`"
-            ))),
+            v => Err(SciLsError::InvalidDepreciationInformation(v).into()),
         }
     }
 }
@@ -272,7 +274,7 @@ pub enum SCILSDrivewayInformation {
 }
 
 impl TryFrom<u8> for SCILSDrivewayInformation {
-    type Error = RastaError;
+    type Error = SciError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
@@ -281,9 +283,7 @@ impl TryFrom<u8> for SCILSDrivewayInformation {
             0x3 => Ok(Self::Way3),
             0x4 => Ok(Self::Way4),
             0xFF => Ok(Self::NoInformation),
-            v => Err(RastaError::Other(format!(
-                "Invalid driveway information `{v}`"
-            ))),
+            v => Err(SciLsError::InvalidDrivewayInformation(v).into()),
         }
     }
 }
@@ -297,13 +297,13 @@ pub enum SCILSDarkSwitching {
 }
 
 impl TryFrom<u8> for SCILSDarkSwitching {
-    type Error = RastaError;
+    type Error = SciError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             0x01 => Ok(Self::Show),
             0xFF => Ok(Self::Dark),
-            v => Err(RastaError::Other(format!("Invalid dark switching `{v}`"))),
+            v => Err(SciLsError::InvalidDarkSwitching(v).into()),
         }
     }
 }
@@ -317,14 +317,14 @@ pub enum SCILSBrightness {
 }
 
 impl TryFrom<u8> for SCILSBrightness {
-    type Error = RastaError;
+    type Error = SciError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             0x01 => Ok(Self::Day),
             0x02 => Ok(Self::Night),
             0xFF => Ok(Self::Undefined),
-            v => Err(RastaError::Other(format!("Invalid brightness `{v}`"))),
+            v => Err(SciLsError::InvalidBrightness(v).into()),
         }
     }
 }
@@ -346,6 +346,7 @@ pub struct SCILSSignalAspect {
 }
 
 impl SCILSSignalAspect {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         main: SCILSMain,
         additional: SCILSAdditional,
@@ -439,7 +440,7 @@ impl From<SCILSSignalAspect> for SCIPayload {
 }
 
 impl TryFrom<&[u8]> for SCILSSignalAspect {
-    type Error = RastaError;
+    type Error = SciError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         let main = SCILSMain::try_from(value[0])?;

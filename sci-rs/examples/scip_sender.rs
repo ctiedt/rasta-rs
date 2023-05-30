@@ -1,11 +1,9 @@
 use std::{collections::HashMap, net::SocketAddr};
 
-use rasta_rs::{
-    sci::{
-        scip::{SCIPointLocation, SCIPointTargetLocation},
-        SCICommand, SCIConnection, SCIMessageType, SCITelegram,
-    },
-    RastaConnection,
+use rasta_rs::RastaConnection;
+use sci_rs::{
+    scip::{SCIPointLocation, SCIPointTargetLocation},
+    SCICommand, SCIConnection, SCIMessageType, SCITelegram,
 };
 
 fn main() {
@@ -27,7 +25,7 @@ fn main() {
                     } else {
                         SCIPointTargetLocation::PointLocationChangeToLeft
                     };
-                    SCICommand::Telegram(SCITelegram::change_location(
+                    return SCICommand::Telegram(SCITelegram::change_location(
                         "C",
                         "S",
                         SCIPointTargetLocation::PointLocationChangeToLeft,
