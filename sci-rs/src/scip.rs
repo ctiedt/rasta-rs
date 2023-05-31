@@ -8,12 +8,6 @@ pub enum SciPError {
     UnknownLocation(u8),
 }
 
-impl From<SciPError> for SciError {
-    fn from(value: SciPError) -> Self {
-        SciError::P(value)
-    }
-}
-
 use crate::SciError;
 
 use super::{ProtocolType, SCIMessageType, SCIPayload, SCITelegram};

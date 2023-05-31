@@ -30,6 +30,19 @@ impl From<SciLsError> for SciError {
     }
 }
 
+impl From<SciPError> for SciError {
+    fn from(value: SciPError) -> Self {
+        SciError::P(value)
+    }
+}
+
+#[cfg(feature = "rasta")]
+impl From<SciError> for RastaError {
+    fn from(value: SciError) -> Self {
+        Self::Other(format!("{:?}", value))
+    }
+}
+
 pub mod scils;
 pub mod scip;
 
@@ -402,7 +415,7 @@ impl SCIConnection {
 
     pub fn receive_telegram(&mut self) -> Result<SCITelegram, RastaError> {
         let msg = self.conn.receive_message()?;
-        SCITelegram::try_from(msg.data())
+        SCITelegram::try_from(msg.data()).map_err(|e| e.into())
     }
 
     pub fn run<F>(&mut self, peer: &str, mut telegram_fn: F) -> Result<(), RastaError>
