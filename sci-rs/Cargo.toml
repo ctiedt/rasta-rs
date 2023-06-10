@@ -13,6 +13,14 @@ required-features = ["rasta"]
 name = "scip_receiver"
 required-features = ["rasta"]
 
+[[example]]
+name = "scils_sender"
+required-features = ["rasta"]
+
+[[example]]
+name = "scils_receiver"
+required-features = ["rasta"]
+
 [features]
 rasta = ["rasta-rs"]
 

@@ -175,6 +175,8 @@ impl TryFrom<u8> for SCIMessageType {
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             0x0001 => Ok(Self::scip_change_location()),
+            0x0002 => Ok(Self::scils_change_brightness()),
+            0x0004 => Ok(Self::scils_brightness_status()),
             0x000B => Ok(Self::scip_location_status()),
             0x000C => Ok(Self::sci_timeout()),
             v => Err(SciError::UnknownMessageType(v)),
