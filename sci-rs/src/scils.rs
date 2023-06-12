@@ -308,7 +308,7 @@ impl TryFrom<u8> for SCILSDarkSwitching {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(u8)]
 pub enum SCILSBrightness {
     Day = 0x01,
