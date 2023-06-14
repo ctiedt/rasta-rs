@@ -131,6 +131,15 @@ impl SCIMessageType {
         }
     }
 
+    pub fn try_as_scip_message_type_from(value: u8) -> Result<Self, SciError> {
+        match value {
+            0x0001 => Ok(Self::scip_change_location()),
+            0x000B => Ok(Self::scip_location_status()),
+            0x000C => Ok(Self::sci_timeout()),
+            v => Err(SciError::UnknownMessageType(v)),
+        }
+    }
+
     pub fn try_as_scils_message_type(&self) -> Result<&str, SciError> {
         match self.0 {
             0x0001 => Ok("ShowSignalAspect"),
@@ -138,6 +147,17 @@ impl SCIMessageType {
             0x0003 => Ok("SignalAspectStatus"),
             0x0004 => Ok("BrightnessStatus"),
             _ => self.try_as_sci_message_type(),
+        }
+    }
+
+    pub fn try_as_scils_message_type_from(value: u8) -> Result<Self, SciError> {
+        match value {
+            0x0001 => Ok(Self::scils_show_signal_aspect()),
+            0x0002 => Ok(Self::scils_change_brightness()),
+            0x0003 => Ok(Self::scils_signal_aspect_status()),
+            0x0004 => Ok(Self::scils_brightness_status()),
+            0x000C => Ok(Self::sci_timeout()),
+            v => Err(SciError::UnknownMessageType(v)),
         }
     }
 }
@@ -165,21 +185,6 @@ impl TryFrom<u8> for SCIVersionCheckResult {
             1 => Ok(Self::VersionsAreEqual),
             2 => Ok(Self::VersionsAreEqual),
             v => Err(SciError::UnknownVersionCheckResult(v)),
-        }
-    }
-}
-
-impl TryFrom<u8> for SCIMessageType {
-    type Error = SciError;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            0x0001 => Ok(Self::scip_change_location()),
-            0x0002 => Ok(Self::scils_change_brightness()),
-            0x0004 => Ok(Self::scils_brightness_status()),
-            0x000B => Ok(Self::scip_location_status()),
-            0x000C => Ok(Self::sci_timeout()),
-            v => Err(SciError::UnknownMessageType(v)),
         }
     }
 }
@@ -303,9 +308,14 @@ impl TryFrom<&[u8]> for SCITelegram {
     type Error = SciError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        let protocol_type = ProtocolType::try_from(value[0])?;
+        let message_type = match protocol_type {
+            ProtocolType::SCIProtocolP => SCIMessageType::try_as_scip_message_type_from(value[1])?,
+            ProtocolType::SCIProtocolLS => SCIMessageType::try_as_scils_message_type_from(value[1])?
+        };
         Ok(Self {
-            protocol_type: ProtocolType::try_from(value[0])?,
-            message_type: SCIMessageType::try_from(value[1])?,
+            protocol_type,
+            message_type,
             sender: String::from_utf8_lossy(&value[2..22]).to_string(),
             receiver: String::from_utf8_lossy(&value[22..42]).to_string(),
             payload: SCIPayload::from_slice(&value[42..]),
