@@ -3,6 +3,9 @@ name = "sci-rs"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [[example]]
@@ -11,6 +14,14 @@ required-features = ["rasta"]
 
 [[example]]
 name = "scip_receiver"
+required-features = ["rasta"]
+
+[[example]]
+name = "scils_sender"
+required-features = ["rasta"]
+
+[[example]]
+name = "scils_receiver"
 required-features = ["rasta"]
 
 [features]
