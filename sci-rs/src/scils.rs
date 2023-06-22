@@ -37,7 +37,7 @@ impl SCIMessageType {
 }
 
 /// The possible aspects of a main signal
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, PartialEq, Debug)]
 #[repr(u8)]
 pub enum SCILSMain {
     Hp0 = 0x01,
