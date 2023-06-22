@@ -282,7 +282,7 @@ impl TryFrom<u8> for SCILSDrivewayInformation {
             0x2 => Ok(Self::Way2),
             0x3 => Ok(Self::Way3),
             0x4 => Ok(Self::Way4),
-            0xFF => Ok(Self::NoInformation),
+            0xF => Ok(Self::NoInformation),
             v => Err(SciLsError::InvalidDrivewayInformation(v).into()),
         }
     }
