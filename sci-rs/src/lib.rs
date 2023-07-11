@@ -123,6 +123,18 @@ impl SCIMessageType {
         }
     }
 
+    pub fn try_as_sci_message_type_from(value: u8) -> Result<Self, SciError> {
+        match value {
+            0x0024 => Ok(Self::sci_version_request()),
+            0x0025 => Ok(Self::sci_version_response()),
+            0x0021 => Ok(Self::sci_status_request()),
+            0x0022 => Ok(Self::sci_status_begin()),
+            0x0023 => Ok(Self::sci_status_finish()),
+            0x000C => Ok(Self::sci_timeout()),
+            v => Err(SciError::UnknownMessageType(v)),
+        }
+    }
+
     pub fn try_as_scip_message_type(&self) -> Result<&str, SciError> {
         match self.0 {
             0x0001 => Ok("ChangeLocation"),
@@ -135,8 +147,7 @@ impl SCIMessageType {
         match value {
             0x0001 => Ok(Self::scip_change_location()),
             0x000B => Ok(Self::scip_location_status()),
-            0x000C => Ok(Self::sci_timeout()),
-            v => Err(SciError::UnknownMessageType(v)),
+            _ => Self::try_as_sci_message_type_from(value),
         }
     }
 
@@ -156,8 +167,7 @@ impl SCIMessageType {
             0x0002 => Ok(Self::scils_change_brightness()),
             0x0003 => Ok(Self::scils_signal_aspect_status()),
             0x0004 => Ok(Self::scils_brightness_status()),
-            0x000C => Ok(Self::sci_timeout()),
-            v => Err(SciError::UnknownMessageType(v)),
+            _ => Self::try_as_sci_message_type_from(value),
         }
     }
 }
