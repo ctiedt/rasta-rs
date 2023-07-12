@@ -90,7 +90,7 @@ impl TryFrom<u8> for SCILSMain {
 /// The possible types of an additional signal
 /// (excluding Zs2(v) and Zs3(v) which can show
 /// additional information and are listed separately)
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, PartialEq, Debug)]
 #[repr(u8)]
 pub enum SCILSAdditional {
     Zs1 = 0x01,
