@@ -37,7 +37,7 @@ impl SCIMessageType {
 }
 
 /// The possible aspects of a main signal
-#[derive(Default, Clone, Copy, PartialEq, Debug)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum SCILSMain {
     Hp0 = 0x01,
@@ -90,7 +90,7 @@ impl TryFrom<u8> for SCILSMain {
 /// The possible types of an additional signal
 /// (excluding Zs2(v) and Zs3(v) which can show
 /// additional information and are listed separately)
-#[derive(Default, Clone, Copy, PartialEq, Debug)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum SCILSAdditional {
     Zs1 = 0x01,
