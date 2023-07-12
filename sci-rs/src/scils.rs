@@ -119,7 +119,7 @@ impl TryFrom<u8> for SCILSAdditional {
 }
 
 /// Possible aspects for Zs3 and Zs3v signals
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum SCILSZs3 {
     Index1 = 0x01,
