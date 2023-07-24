@@ -172,9 +172,9 @@ impl SCIMessageType {
     }
 }
 
-impl From<SCIMessageType> for [u8; 2] {
+impl From<SCIMessageType> for u16 {
     fn from(val: SCIMessageType) -> Self {
-        val.0.to_be_bytes()
+        val.0
     }
 }
 
@@ -337,8 +337,8 @@ impl TryFrom<&[u8]> for SCITelegram {
 impl From<SCITelegram> for Vec<u8> {
     fn from(val: SCITelegram) -> Self {
         let mut data = vec![val.protocol_type as u8];
-        let message_type: [u8; 2] = val.message_type.into();
-        data.append(&mut message_type.to_vec());
+        let message_type: u16 = val.message_type.into();
+        data.append(&mut message_type.to_be_bytes().to_vec());
         data.append(&mut str_to_sci_name(&val.sender));
         data.append(&mut str_to_sci_name(&val.receiver));
         if val.payload.used > 0 {
