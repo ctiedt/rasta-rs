@@ -37,7 +37,7 @@ impl SCIMessageType {
 }
 
 /// The possible aspects of a main signal
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum SCILSMain {
     Hp0 = 0x01,
@@ -90,7 +90,7 @@ impl TryFrom<u8> for SCILSMain {
 /// The possible types of an additional signal
 /// (excluding Zs2(v) and Zs3(v) which can show
 /// additional information and are listed separately)
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum SCILSAdditional {
     Zs1 = 0x01,
@@ -119,7 +119,7 @@ impl TryFrom<u8> for SCILSAdditional {
 }
 
 /// Possible aspects for Zs3 and Zs3v signals
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum SCILSZs3 {
     Index1 = 0x01,
@@ -282,7 +282,7 @@ impl TryFrom<u8> for SCILSDrivewayInformation {
             0x2 => Ok(Self::Way2),
             0x3 => Ok(Self::Way3),
             0x4 => Ok(Self::Way4),
-            0xFF => Ok(Self::NoInformation),
+            0xF => Ok(Self::NoInformation),
             v => Err(SciLsError::InvalidDrivewayInformation(v).into()),
         }
     }
