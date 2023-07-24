@@ -18,7 +18,7 @@ use scip::SciPError;
 #[derive(Debug, Clone)]
 pub enum SciError {
     UnknownProtocol(u8),
-    UnknownMessageType(u8),
+    UnknownMessageType(u16),
     UnknownVersionCheckResult(u8),
     UnknownCloseReason(u8),
     Ls(SciLsError),
@@ -85,7 +85,7 @@ impl TryFrom<u8> for ProtocolType {
 /// representations, this is not a enum, but a
 /// newtype with associated functions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct SCIMessageType(u8);
+pub struct SCIMessageType(u16);
 
 impl SCIMessageType {
     pub const fn sci_version_request() -> Self {
@@ -134,7 +134,7 @@ impl SCIMessageType {
         }
     }
 
-    pub fn try_as_sci_message_type_from(value: u8) -> Result<Self, SciError> {
+    pub fn try_as_sci_message_type_from(value: u16) -> Result<Self, SciError> {
         match value {
             0x0024 => Ok(Self::sci_version_request()),
             0x0025 => Ok(Self::sci_version_response()),
@@ -156,7 +156,7 @@ impl SCIMessageType {
         }
     }
 
-    pub fn try_as_scip_message_type_from(value: u8) -> Result<Self, SciError> {
+    pub fn try_as_scip_message_type_from(value: u16) -> Result<Self, SciError> {
         match value {
             0x0001 => Ok(Self::scip_change_location()),
             0x000B => Ok(Self::scip_location_status()),
@@ -174,7 +174,7 @@ impl SCIMessageType {
         }
     }
 
-    pub fn try_as_scils_message_type_from(value: u8) -> Result<Self, SciError> {
+    pub fn try_as_scils_message_type_from(value: u16) -> Result<Self, SciError> {
         match value {
             0x0001 => Ok(Self::scils_show_signal_aspect()),
             0x0002 => Ok(Self::scils_change_brightness()),
@@ -185,7 +185,7 @@ impl SCIMessageType {
     }
 }
 
-impl From<SCIMessageType> for u8 {
+impl From<SCIMessageType> for u16 {
     fn from(val: SCIMessageType) -> Self {
         val.0
     }
@@ -381,23 +381,26 @@ impl TryFrom<&[u8]> for SCITelegram {
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         let protocol_type = ProtocolType::try_from(value[0])?;
+        let message_type_as_u16 = u16::from_le_bytes(value[1..3].try_into().unwrap());
         let message_type = match protocol_type {
-            ProtocolType::SCIProtocolP => SCIMessageType::try_as_scip_message_type_from(value[1])?,
-            ProtocolType::SCIProtocolLS => SCIMessageType::try_as_scils_message_type_from(value[1])?
+            ProtocolType::SCIProtocolP => SCIMessageType::try_as_scip_message_type_from(message_type_as_u16)?,
+            ProtocolType::SCIProtocolLS => SCIMessageType::try_as_scils_message_type_from(message_type_as_u16)?
         };
         Ok(Self {
             protocol_type,
             message_type,
-            sender: String::from_utf8_lossy(&value[2..22]).to_string(),
-            receiver: String::from_utf8_lossy(&value[22..42]).to_string(),
-            payload: SCIPayload::from_slice(&value[42..]),
+            sender: String::from_utf8_lossy(&value[3..23]).to_string(),
+            receiver: String::from_utf8_lossy(&value[23..43]).to_string(),
+            payload: SCIPayload::from_slice(&value[43..]),
         })
     }
 }
 
 impl From<SCITelegram> for Vec<u8> {
     fn from(val: SCITelegram) -> Self {
-        let mut data = vec![val.protocol_type as u8, val.message_type.into()];
+        let mut data = vec![val.protocol_type as u8];
+        let message_type: u16 = val.message_type.into();
+        data.append(&mut message_type.to_le_bytes().to_vec());
         data.append(&mut str_to_sci_name(&val.sender));
         data.append(&mut str_to_sci_name(&val.receiver));
         if val.payload.used > 0 {
