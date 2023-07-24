@@ -381,7 +381,7 @@ impl TryFrom<&[u8]> for SCITelegram {
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         let protocol_type = ProtocolType::try_from(value[0])?;
-        let message_type_as_u16 = u16::from_be_bytes(value[1..3].try_into().unwrap());
+        let message_type_as_u16 = u16::from_ne_bytes(value[1..3].try_into().unwrap());
         let message_type = match protocol_type {
             ProtocolType::SCIProtocolP => SCIMessageType::try_as_scip_message_type_from(message_type_as_u16)?,
             ProtocolType::SCIProtocolLS => SCIMessageType::try_as_scils_message_type_from(message_type_as_u16)?
@@ -400,7 +400,7 @@ impl From<SCITelegram> for Vec<u8> {
     fn from(val: SCITelegram) -> Self {
         let mut data = vec![val.protocol_type as u8];
         let message_type: u16 = val.message_type.into();
-        data.append(&mut message_type.to_be_bytes().to_vec());
+        data.append(&mut message_type.to_ne_bytes().to_vec());
         data.append(&mut str_to_sci_name(&val.sender));
         data.append(&mut str_to_sci_name(&val.receiver));
         if val.payload.used > 0 {
