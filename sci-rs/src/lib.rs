@@ -20,6 +20,7 @@ pub enum SciError {
     UnknownProtocol(u8),
     UnknownMessageType(u8),
     UnknownVersionCheckResult(u8),
+    UnknownCloseReason(u8),
     Ls(SciLsError),
     P(SciPError),
 }
@@ -107,6 +108,14 @@ impl SCIMessageType {
         Self(0x0023)
     }
 
+    pub const fn sci_close() -> Self {
+        Self(0x0027)
+    }
+
+    pub const fn sci_release_for_maintenance() -> Self {
+        Self(0x0028)
+    }
+
     pub const fn sci_timeout() -> Self {
         Self(0x000C)
     }
@@ -118,6 +127,8 @@ impl SCIMessageType {
             0x0021 => Ok("StatusRequest"),
             0x0022 => Ok("StatusBegin"),
             0x0023 => Ok("StatusFinish"),
+            0x0027 => Ok("Close"),
+            0x0028 => Ok("ReleaseForMaintenance"),
             0x000C => Ok("Timeout"),
             v => Err(SciError::UnknownMessageType(v)),
         }
@@ -130,6 +141,8 @@ impl SCIMessageType {
             0x0021 => Ok(Self::sci_status_request()),
             0x0022 => Ok(Self::sci_status_begin()),
             0x0023 => Ok(Self::sci_status_finish()),
+            0x0027 => Ok(Self::sci_close()),
+            0x0028 => Ok(Self::sci_release_for_maintenance()),
             0x000C => Ok(Self::sci_timeout()),
             v => Err(SciError::UnknownMessageType(v)),
         }
@@ -195,6 +208,35 @@ impl TryFrom<u8> for SCIVersionCheckResult {
             1 => Ok(Self::VersionsAreEqual),
             2 => Ok(Self::VersionsAreEqual),
             v => Err(SciError::UnknownVersionCheckResult(v)),
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum SCICloseReason {
+    ProtocolError = 1,
+    FormalTelegramError = 2,
+    ContentTelegramError = 3,
+    NormalClose = 4,
+    OtherVersionRequired = 5,
+    Timeout = 6,
+    ChecksumMismatch = 7,    
+}
+
+impl TryFrom<u8> for SCICloseReason {
+    type Error = SciError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(Self::ProtocolError),
+            2 => Ok(Self::FormalTelegramError),
+            3 => Ok(Self::ContentTelegramError),
+            4 => Ok(Self::NormalClose),
+            5 => Ok(Self::OtherVersionRequired),
+            6 => Ok(Self::Timeout),
+            7 => Ok(Self::ChecksumMismatch),
+            v => Err(SciError::UnknownCloseReason(v)),
         }
     }
 }
@@ -300,6 +342,26 @@ impl SCITelegram {
             sender: sender.to_string(),
             receiver: receiver.to_string(),
             payload: SCIPayload::default(),
+        }
+    }
+
+    pub fn close(protocol_type: ProtocolType, sender: &str, receiver: &str, close_reason: SCICloseReason) -> Self {
+        Self {
+            protocol_type, 
+            message_type: SCIMessageType::sci_close(),
+            sender: sender.to_string(),
+            receiver: receiver.to_string(),
+            payload: SCIPayload::from_slice(&[close_reason as u8])
+        }
+    }
+
+    pub fn release_for_maintenance(protocol_type: ProtocolType, sender: &str, receiver: &str) -> Self {
+        Self { 
+            protocol_type,
+            message_type: SCIMessageType::sci_release_for_maintenance(),
+            sender: sender.to_string(), 
+            receiver: receiver.to_string(),
+            payload: SCIPayload::default()
         }
     }
 
