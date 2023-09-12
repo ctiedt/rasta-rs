@@ -8,19 +8,14 @@ pub enum SciPError {
     UnknownLocation(u8),
 }
 
-use crate::SciError;
+use crate::{impl_sci_message_type, SciError};
 
 use super::{ProtocolType, SCIMessageType, SCIPayload, SCITelegram};
 
-impl SCIMessageType {
-    pub const fn scip_change_location() -> Self {
-        Self(0x0001)
-    }
-
-    pub const fn scip_location_status() -> Self {
-        Self(0x000B)
-    }
-}
+impl_sci_message_type!(
+    (scip_change_location, 0x0001),
+    (scip_location_status, 0x000B)
+);
 
 /// The target location of [`SCITelegram::change_location`].
 #[derive(Clone, Copy)]
