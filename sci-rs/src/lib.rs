@@ -244,7 +244,7 @@ impl SCIMessageType {
         }
     }
 
-    #[cfg(feature = "scils")]
+    #[cfg(feature = "scitds")]
     pub fn try_as_scitds_message_type_from(value: u16) -> Result<Self, SciError> {
         match value {
             0x0001 => Ok(Self::scitds_fc()),
