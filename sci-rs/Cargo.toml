@@ -25,7 +25,11 @@ name = "scils_receiver"
 required-features = ["rasta"]
 
 [features]
+default = ["scip", "scils", "scitds"]
 rasta = ["rasta-rs"]
+scip = []
+scils = []
+scitds = []
 
 [dependencies]
-rasta-rs = { path = "../rasta-rs", optional = true}
+rasta-rs = { path = "../rasta-rs", optional = true }

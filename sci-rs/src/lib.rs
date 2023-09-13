@@ -6,13 +6,16 @@
 
 #[cfg(feature = "rasta")]
 use std::collections::HashMap;
+use std::fmt::Display;
 
 #[cfg(feature = "rasta")]
 use rasta_rs::{
     message::RastaId, RastaConnection, RastaConnectionState, RastaError, RastaListener,
     RASTA_TIMEOUT_DURATION,
 };
+#[cfg(feature = "scils")]
 use scils::SciLsError;
+#[cfg(feature = "scip")]
 use scip::SciPError;
 
 #[derive(Debug, Clone)]
@@ -21,16 +24,40 @@ pub enum SciError {
     UnknownMessageType(u16),
     UnknownVersionCheckResult(u8),
     UnknownCloseReason(u8),
+    #[cfg(feature = "scils")]
     Ls(SciLsError),
+    #[cfg(feature = "scip")]
     P(SciPError),
 }
 
+impl Display for SciError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let reason = match self {
+            SciError::UnknownProtocol(p) => format!("Unknown Protocol {:x}", p),
+            SciError::UnknownMessageType(m) => format!("Unknown Message Type {:x}", m),
+            SciError::UnknownVersionCheckResult(v) => {
+                format!("Unknown Version Check Result {:x}", v)
+            }
+            SciError::UnknownCloseReason(c) => format!("Unknown Close Reason {:x}", c),
+            #[cfg(feature = "scils")]
+            SciError::Ls(l) => l.to_string(),
+            #[cfg(feature = "scip")]
+            SciError::P(p) => p.to_string(),
+        };
+        write!(f, "{}", reason)
+    }
+}
+
+impl std::error::Error for SciError {}
+
+#[cfg(feature = "scils")]
 impl From<SciLsError> for SciError {
     fn from(value: SciLsError) -> Self {
         SciError::Ls(value)
     }
 }
 
+#[cfg(feature = "scip")]
 impl From<SciPError> for SciError {
     fn from(value: SciPError) -> Self {
         SciError::P(value)
@@ -44,8 +71,11 @@ impl From<SciError> for RastaError {
     }
 }
 
+#[cfg(feature = "scils")]
 pub mod scils;
+#[cfg(feature = "scip")]
 pub mod scip;
+#[cfg(feature = "scitds")]
 pub mod scitds;
 
 /// The current version of this SCI implementation.
@@ -81,6 +111,7 @@ impl TryFrom<u8> for ProtocolType {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
+            0x20 => Ok(Self::SCIProtocolTDS),
             0x40 => Ok(Self::SCIProtocolP),
             0x30 => Ok(Self::SCIProtocolLS),
             v => Err(SciError::UnknownProtocol(v)),
@@ -156,6 +187,7 @@ impl SCIMessageType {
         }
     }
 
+    #[cfg(feature = "scip")]
     pub fn try_as_scip_message_type(&self) -> Result<&str, SciError> {
         match self.0 {
             0x0001 => Ok("ChangeLocation"),
@@ -164,6 +196,7 @@ impl SCIMessageType {
         }
     }
 
+    #[cfg(feature = "scip")]
     pub fn try_as_scip_message_type_from(value: u16) -> Result<Self, SciError> {
         match value {
             0x0001 => Ok(Self::scip_change_location()),
@@ -172,6 +205,7 @@ impl SCIMessageType {
         }
     }
 
+    #[cfg(feature = "scils")]
     pub fn try_as_scils_message_type(&self) -> Result<&str, SciError> {
         match self.0 {
             0x0001 => Ok("ShowSignalAspect"),
@@ -182,12 +216,47 @@ impl SCIMessageType {
         }
     }
 
+    #[cfg(feature = "scils")]
     pub fn try_as_scils_message_type_from(value: u16) -> Result<Self, SciError> {
         match value {
             0x0001 => Ok(Self::scils_show_signal_aspect()),
             0x0002 => Ok(Self::scils_change_brightness()),
             0x0003 => Ok(Self::scils_signal_aspect_status()),
             0x0004 => Ok(Self::scils_brightness_status()),
+            _ => Self::try_as_sci_message_type_from(value),
+        }
+    }
+
+    #[cfg(feature = "scitds")]
+    pub fn try_as_scitds_message_type(&self) -> Result<&str, SciError> {
+        match self.0 {
+            0x0001 => Ok("FC"),
+            0x0002 => Ok("UpdateFillingLevel"),
+            0x0003 => Ok("DRFC"),
+            0x0008 => Ok("Cancel"),
+            0x0006 => Ok("CommandRejected"),
+            0x0007 => Ok("TvpsOccupancyStatus"),
+            0x0010 => Ok("TvpsFcPFailed"),
+            0x0011 => Ok("TvpsFcPAFailed"),
+            0x0012 => Ok("AdditionalInformation"),
+            0x000B => Ok("TdpStatus"),
+            _ => self.try_as_sci_message_type(),
+        }
+    }
+
+    #[cfg(feature = "scils")]
+    pub fn try_as_scitds_message_type_from(value: u16) -> Result<Self, SciError> {
+        match value {
+            0x0001 => Ok(Self::scitds_fc()),
+            0x0002 => Ok(Self::scitds_update_filling_level()),
+            0x0003 => Ok(Self::scitds_drfc()),
+            0x0008 => Ok(Self::scitds_cancel()),
+            0x0006 => Ok(Self::scitds_command_rejected()),
+            0x0007 => Ok(Self::scitds_tvps_occupancy_status()),
+            0x0010 => Ok(Self::scitds_tvps_fc_p_failed()),
+            0x0011 => Ok(Self::scitds_tvps_fc_p_a_failed()),
+            0x0012 => Ok(Self::scitds_additional_information()),
+            0x000B => Ok(Self::scitds_tdp_status()),
             _ => Self::try_as_sci_message_type_from(value),
         }
     }
@@ -433,11 +502,17 @@ impl TryFrom<&[u8]> for SCITelegram {
         let protocol_type = ProtocolType::try_from(value[0])?;
         let message_type_as_u16 = u16::from_le_bytes(value[1..3].try_into().unwrap());
         let message_type = match protocol_type {
+            #[cfg(feature = "scip")]
             ProtocolType::SCIProtocolP => {
                 SCIMessageType::try_as_scip_message_type_from(message_type_as_u16)?
             }
+            #[cfg(feature = "scils")]
             ProtocolType::SCIProtocolLS => {
                 SCIMessageType::try_as_scils_message_type_from(message_type_as_u16)?
+            }
+            #[cfg(feature = "scitds")]
+            ProtocolType::SCIProtocolTDS => {
+                SCIMessageType::try_as_scitds_message_type_from(message_type_as_u16)?
             }
             _ => unimplemented!(),
         };

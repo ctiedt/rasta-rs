@@ -8,6 +8,16 @@ pub enum SciPError {
     UnknownLocation(u8),
 }
 
+impl Display for SciPError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl std::error::Error for SciPError {}
+
+use std::fmt::Display;
+
 use crate::{impl_sci_message_type, SciError};
 
 use super::{ProtocolType, SCIMessageType, SCIPayload, SCITelegram};
