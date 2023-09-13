@@ -6,7 +6,7 @@
 
 #[cfg(feature = "rasta")]
 use std::collections::HashMap;
-use std::fmt::Display;
+use std::{fmt::Display, ops::Deref};
 
 #[cfg(feature = "rasta")]
 use rasta_rs::{
@@ -324,6 +324,14 @@ impl TryFrom<u8> for SCICloseReason {
 pub struct SCIPayload {
     pub data: [u8; 85],
     pub used: usize,
+}
+
+impl Deref for SCIPayload {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
 }
 
 impl Default for SCIPayload {
