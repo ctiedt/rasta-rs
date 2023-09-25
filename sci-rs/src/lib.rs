@@ -17,6 +17,49 @@ use rasta_rs::{
 use scils::SciLsError;
 #[cfg(feature = "scip")]
 use scip::SciPError;
+#[cfg(feature = "scitds")]
+use scitds::SciTdsError;
+
+/// Helper macro to generate enums with numeric values including a [TryFrom] implementation
+macro_rules! enumerate {
+    ($name:ident, $repr:ty, $error:expr, {$($variant:ident = $value:literal),*}) => {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        #[repr($repr)]
+        pub enum $name {
+            $($variant = $value,)*
+        }
+
+        impl TryFrom<$repr> for $name {
+            type Error = crate::SciError;
+
+            fn try_from(value: $repr) -> Result<Self, Self::Error> {
+                match value {
+                    $($value => Ok(Self::$variant),)*
+                    v => Err($error(v).into())
+                }
+            }
+        }
+    };
+    ($name:ident, $doc:literal, $repr:ty, $error:expr, {$($variant:ident = $value:literal),*}) => {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        #[doc = $doc]
+        #[repr($repr)]
+        pub enum $name {
+            $($variant = $value,)*
+        }
+
+        impl TryFrom<$repr> for $name {
+            type Error = crate::SciError;
+
+            fn try_from(value: $repr) -> Result<Self, Self::Error> {
+                match value {
+                    $($value => Ok(Self::$variant),)*
+                    v => Err($error(v).into())
+                }
+            }
+        }
+    };
+}
 
 #[derive(Debug, Clone)]
 pub enum SciError {
@@ -28,6 +71,8 @@ pub enum SciError {
     Ls(SciLsError),
     #[cfg(feature = "scip")]
     P(SciPError),
+    #[cfg(feature = "scitds")]
+    Tds(SciTdsError),
 }
 
 impl Display for SciError {
@@ -43,6 +88,8 @@ impl Display for SciError {
             SciError::Ls(l) => l.to_string(),
             #[cfg(feature = "scip")]
             SciError::P(p) => p.to_string(),
+            #[cfg(feature = "scitds")]
+            SciError::Tds(tds) => tds.to_string(),
         };
         write!(f, "{}", reason)
     }
@@ -61,6 +108,13 @@ impl From<SciLsError> for SciError {
 impl From<SciPError> for SciError {
     fn from(value: SciPError) -> Self {
         SciError::P(value)
+    }
+}
+
+#[cfg(feature = "scitds")]
+impl From<SciTdsError> for SciError {
+    fn from(value: SciTdsError) -> Self {
+        SciError::Tds(value)
     }
 }
 

@@ -1,9 +1,30 @@
 //! SCI Train Detection System
 
+use std::fmt::Display;
+
 use crate::{
     impl_sci_message_type, impl_sci_messages_without_payload, ProtocolType, SCIMessageType,
     SCIPayload, SCITelegram,
 };
+
+#[derive(Clone, Debug)]
+pub enum SciTdsError {
+    UnknownFcMode(u8),
+    UnknownOccupancyStatus(u8),
+    UnknownPOMStatus(u8),
+    UnknownDisturbanceStatus(u8),
+    UnknownChangeTrigger(u8),
+    UnknownRejectionReason(u8),
+    UnknownFCPFailureReason(u8),
+    UnknownStateOfPassing(u8),
+    UnknownDirectionOfPassing(u8),
+}
+
+impl Display for SciTdsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
 
 // See Eu.Doc.44
 impl_sci_message_type!(
@@ -19,87 +40,92 @@ impl_sci_message_type!(
     (scitds_tdp_status, 0x000B)
 );
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum FCMode {
-    U = 0x01,
-    C = 0x02,
-    PA = 0x03,
-    P = 0x04,
-    Ack = 0x05,
+enumerate! {
+    FCMode, "Force Clear Mode",
+    u8,
+    SciTdsError::UnknownFcMode,
+    {U = 0x01, C = 0x02, PA = 0x03, P = 0x04, Ack = 0x05}
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum OccupancyStatus {
-    Vacant = 0x01,
-    Occupied = 0x02,
-    Disturbed = 0x03,
-    WaitingForSweepingTrain = 0x04,
-    WaitingForAck = 0x05,
-    SweepingTrainDetected = 0x06,
+enumerate! {
+    OccupancyStatus,
+    u8,
+    SciTdsError::UnknownOccupancyStatus,
+    {Vacant = 0x01, Occupied = 0x02, Disturbed = 0x03, WaitingForSweepingTrain = 0x04, WaitingForAck = 0x05, SweepingTrainDetected = 0x06}
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum POMStatus {
-    Ok = 0x01,
-    NotOk = 0x02,
-    NotApplicable = 0xFF,
+enumerate! {
+    POMStatus,
+    u8,
+    SciTdsError::UnknownPOMStatus,
+    {Ok = 0x01, NotOk = 0x02, NotApplicable = 0xFF}
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum DisturbanceStatus {
+enumerate! {
+    DisturbanceStatus,
+    u8,
+    SciTdsError::UnknownDisturbanceStatus, {
     Operational = 0x01,
     Technical = 0x02,
-    NotApplicable = 0xFF,
+    NotApplicable = 0xFF
+}
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum ChangeTrigger {
-    PassingDetected = 0x01,
-    CommandFromEILAccepted = 0x02,
-    CommandFromMaintainerAccepted = 0x03,
-    TechnicalFailure = 0x04,
-    InitialSectionState = 0x05,
-    InternalTrigger = 0x06,
-    NotApplicable = 0xFF,
+enumerate! {
+    ChangeTrigger,
+    u8,
+    SciTdsError::UnknownChangeTrigger,
+    {
+        PassingDetected = 0x01,
+        CommandFromEILAccepted = 0x02,
+        CommandFromMaintainerAccepted = 0x03,
+        TechnicalFailure = 0x04,
+        InitialSectionState = 0x05,
+        InternalTrigger = 0x06,
+        NotApplicable = 0xFF
+    }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum RejectionReason {
-    Operational = 0x01,
-    Technical = 0x02,
+enumerate! {
+    RejectionReason,
+    u8,
+    SciTdsError::UnknownRejectionReason,
+    {
+        Operational = 0x01,
+        Technical = 0x02
+    }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum FCPFailureReason {
+enumerate! {
+    FCPFailureReason,
+    u8,
+    SciTdsError::UnknownFCPFailureReason, {
     IncorrectCountOfSweepingTrain = 0x01,
     Timeout = 0x02,
     IllegalBoundingDetectionPointConfig = 0x03,
     IntentionallyDeleted = 0x04,
     OutgoingAxleBeforeMinTimerExpiry = 0x05,
-    ProcessCancelled = 0x06,
-}
+    ProcessCancelled = 0x06
+}}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum StateOfPassing {
+enumerate! {
+    StateOfPassing,
+    u8,
+    SciTdsError::UnknownStateOfPassing, {
     NotPassed = 0x01,
     Passed = 0x02,
-    Disturbed = 0x03,
-}
+    Disturbed = 0x03
+}}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum DirectionOfPassing {
-    Reference = 0x01,
-    AgainstReference = 0x02,
-    WithoutIndicatedDirection = 0x03,
+enumerate! {
+    DirectionOfPassing,
+    u8,
+    SciTdsError::UnknownDirectionOfPassing,
+    {
+        Reference = 0x01,
+        AgainstReference = 0x02,
+        WithoutIndicatedDirection = 0x03
+    }
 }
 
 impl_sci_messages_without_payload!(

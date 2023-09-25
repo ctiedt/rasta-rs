@@ -18,7 +18,7 @@ impl std::error::Error for SciPError {}
 
 use std::fmt::Display;
 
-use crate::{impl_sci_message_type, SciError};
+use crate::impl_sci_message_type;
 
 use super::{ProtocolType, SCIMessageType, SCIPayload, SCITelegram};
 
@@ -27,49 +27,25 @@ impl_sci_message_type!(
     (scip_location_status, 0x000B)
 );
 
-/// The target location of [`SCITelegram::change_location`].
-#[derive(Clone, Copy)]
-#[repr(u8)]
-pub enum SCIPointTargetLocation {
+enumerate! {
+    SCIPointTargetLocation,
+    "The target location of [`SCITelegram::change_location`].",
+    u8,
+    SciPError::UnknownTargetLocation, {
     PointLocationChangeToRight = 0x01,
-    PointLocationChangeToLeft = 0x02,
-}
+    PointLocationChangeToLeft = 0x02
+}}
 
-impl TryFrom<u8> for SCIPointTargetLocation {
-    type Error = SciError;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            0x01 => Ok(Self::PointLocationChangeToRight),
-            0x02 => Ok(Self::PointLocationChangeToLeft),
-            v => Err(SciPError::UnknownTargetLocation(v).into()),
-        }
-    }
-}
-
-/// The current location of a point. This is different from
-/// [`SCIPointTargetLocation`] in that it supports locations
-/// that cannot be manually requested.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum SCIPointLocation {
-    PointLocationRight = 0x01,
+enumerate! {
+    SCIPointLocation,
+    "The current location of a point. This is different from [`SCIPointTargetLocation`] in that it supports locations that cannot be manually requested.",
+    u8,
+    SciPError::UnknownLocation,
+    {
+        PointLocationRight = 0x01,
     PointLocationLeft = 0x02,
     PointNoTargetLocation = 0x03,
-    PointBumped = 0x04,
-}
-
-impl TryFrom<u8> for SCIPointLocation {
-    type Error = SciError;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            0x01 => Ok(Self::PointLocationRight),
-            0x02 => Ok(Self::PointLocationLeft),
-            0x03 => Ok(Self::PointNoTargetLocation),
-            0x04 => Ok(Self::PointBumped),
-            v => Err(SciPError::UnknownLocation(v).into()),
-        }
+    PointBumped = 0x04
     }
 }
 
