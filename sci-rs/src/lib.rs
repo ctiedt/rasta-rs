@@ -2,7 +2,7 @@
 //!
 //! SCI is the family of application protocols built on top of RaSTA
 //! to communicate with track elements such as points and signals.
-//! `rasta-rs` provides support for SCI-P at the moment.
+//! `rasta-rs` provides support for SCI-LS, SCI-P and SCI-TDS at the moment.
 
 #[cfg(feature = "rasta")]
 use std::collections::HashMap;
@@ -147,7 +147,7 @@ pub(crate) fn str_to_sci_name(name: &str) -> Vec<u8> {
 
 /// Constants to represent SCI Protocol types.
 #[repr(u8)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum ProtocolType {
     SCIProtocolAIS = 0x01,
     SCIProtocolTDS = 0x20,
@@ -417,6 +417,27 @@ pub struct SCITelegram {
     pub sender: String,
     pub receiver: String,
     pub payload: SCIPayload,
+}
+
+impl Display for SCITelegram {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:?}: {}",
+            self.protocol_type,
+            match self.protocol_type {
+                #[cfg(feature = "scitds")]
+                ProtocolType::SCIProtocolTDS =>
+                    self.message_type.try_as_scitds_message_type().unwrap(),
+                #[cfg(feature = "scils")]
+                ProtocolType::SCIProtocolLS =>
+                    self.message_type.try_as_scils_message_type().unwrap(),
+                #[cfg(feature = "scip")]
+                ProtocolType::SCIProtocolP => self.message_type.try_as_scip_message_type().unwrap(),
+                _ => "Unsupported",
+            }
+        )
+    }
 }
 
 /// Automatically implement the associated functions for messages
