@@ -617,7 +617,7 @@ impl From<SCITelegram> for Vec<u8> {
         data.append(&mut str_to_sci_name(&val.sender));
         data.append(&mut str_to_sci_name(&val.receiver));
         if val.payload.used > 0 {
-            let mut payload = Vec::from(val.payload.data);
+            let mut payload = Vec::from(val.payload.as_ref());
             data.append(&mut payload);
         }
         data
