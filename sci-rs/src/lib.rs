@@ -2,18 +2,64 @@
 //!
 //! SCI is the family of application protocols built on top of RaSTA
 //! to communicate with track elements such as points and signals.
-//! `rasta-rs` provides support for SCI-P at the moment.
+//! `rasta-rs` provides support for SCI-LS, SCI-P and SCI-TDS at the moment.
 
 #[cfg(feature = "rasta")]
 use std::collections::HashMap;
+use std::{fmt::Display, ops::Deref};
 
 #[cfg(feature = "rasta")]
 use rasta_rs::{
     message::RastaId, RastaConnection, RastaConnectionState, RastaError, RastaListener,
     RASTA_TIMEOUT_DURATION,
 };
+#[cfg(feature = "scils")]
 use scils::SciLsError;
+#[cfg(feature = "scip")]
 use scip::SciPError;
+#[cfg(feature = "scitds")]
+use scitds::SciTdsError;
+
+/// Helper macro to generate enums with numeric values including a [TryFrom] implementation
+macro_rules! enumerate {
+    ($name:ident, $repr:ty, $error:expr, {$($variant:ident = $value:literal),*}) => {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        #[repr($repr)]
+        pub enum $name {
+            $($variant = $value,)*
+        }
+
+        impl TryFrom<$repr> for $name {
+            type Error = crate::SciError;
+
+            fn try_from(value: $repr) -> Result<Self, Self::Error> {
+                match value {
+                    $($value => Ok(Self::$variant),)*
+                    v => Err($error(v).into())
+                }
+            }
+        }
+    };
+    ($name:ident, $doc:literal, $repr:ty, $error:expr, {$($variant:ident = $value:literal),*}) => {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        #[doc = $doc]
+        #[repr($repr)]
+        pub enum $name {
+            $($variant = $value,)*
+        }
+
+        impl TryFrom<$repr> for $name {
+            type Error = crate::SciError;
+
+            fn try_from(value: $repr) -> Result<Self, Self::Error> {
+                match value {
+                    $($value => Ok(Self::$variant),)*
+                    v => Err($error(v).into())
+                }
+            }
+        }
+    };
+}
 
 #[derive(Debug, Clone)]
 pub enum SciError {
@@ -21,19 +67,54 @@ pub enum SciError {
     UnknownMessageType(u16),
     UnknownVersionCheckResult(u8),
     UnknownCloseReason(u8),
+    #[cfg(feature = "scils")]
     Ls(SciLsError),
+    #[cfg(feature = "scip")]
     P(SciPError),
+    #[cfg(feature = "scitds")]
+    Tds(SciTdsError),
 }
 
+impl Display for SciError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let reason = match self {
+            SciError::UnknownProtocol(p) => format!("Unknown Protocol {:x}", p),
+            SciError::UnknownMessageType(m) => format!("Unknown Message Type {:x}", m),
+            SciError::UnknownVersionCheckResult(v) => {
+                format!("Unknown Version Check Result {:x}", v)
+            }
+            SciError::UnknownCloseReason(c) => format!("Unknown Close Reason {:x}", c),
+            #[cfg(feature = "scils")]
+            SciError::Ls(l) => l.to_string(),
+            #[cfg(feature = "scip")]
+            SciError::P(p) => p.to_string(),
+            #[cfg(feature = "scitds")]
+            SciError::Tds(tds) => tds.to_string(),
+        };
+        write!(f, "{}", reason)
+    }
+}
+
+impl std::error::Error for SciError {}
+
+#[cfg(feature = "scils")]
 impl From<SciLsError> for SciError {
     fn from(value: SciLsError) -> Self {
         SciError::Ls(value)
     }
 }
 
+#[cfg(feature = "scip")]
 impl From<SciPError> for SciError {
     fn from(value: SciPError) -> Self {
         SciError::P(value)
+    }
+}
+
+#[cfg(feature = "scitds")]
+impl From<SciTdsError> for SciError {
+    fn from(value: SciTdsError) -> Self {
+        SciError::Tds(value)
     }
 }
 
@@ -44,8 +125,12 @@ impl From<SciError> for RastaError {
     }
 }
 
+#[cfg(feature = "scils")]
 pub mod scils;
+#[cfg(feature = "scip")]
 pub mod scip;
+#[cfg(feature = "scitds")]
+pub mod scitds;
 
 /// The current version of this SCI implementation.
 pub const SCI_VERSION: u8 = 0x01;
@@ -62,10 +147,17 @@ pub(crate) fn str_to_sci_name(name: &str) -> Vec<u8> {
 
 /// Constants to represent SCI Protocol types.
 #[repr(u8)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum ProtocolType {
-    SCIProtocolP = 0x40,
+    SCIProtocolAIS = 0x01,
+    SCIProtocolTDS = 0x20,
     SCIProtocolLS = 0x30,
+    SCIProtocolP = 0x40,
+    SCIProtocolRBC = 0x50,
+    SCIProtocolLX = 0x60,
+    SCIProtocolTCS = 0x70,
+    SCIProtocolGIO = 0x90,
+    SCIProtocolELX = 0xC0,
 }
 
 impl TryFrom<u8> for ProtocolType {
@@ -73,6 +165,7 @@ impl TryFrom<u8> for ProtocolType {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
+            0x20 => Ok(Self::SCIProtocolTDS),
             0x40 => Ok(Self::SCIProtocolP),
             0x30 => Ok(Self::SCIProtocolLS),
             v => Err(SciError::UnknownProtocol(v)),
@@ -87,39 +180,33 @@ impl TryFrom<u8> for ProtocolType {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SCIMessageType(u16);
 
+/// Automatically implement the associated functions for message types.
+#[macro_export]
+macro_rules! impl_sci_message_type {
+    ($(($msg:tt, $id:tt)),*) => {
+        impl SCIMessageType {
+            $(pub const fn $msg() -> Self {
+                Self($id)
+            })*
+        }
+    };
+}
+
+impl_sci_message_type!(
+    (pdi_version_check, 0x0024),
+    (pdi_version_response, 0x0025),
+    (pdi_initialisation_request, 0x0021),
+    (pdi_initialisation_response, 0x0022),
+    (pdi_initialisation_completed, 0x0023),
+    (pdi_close, 0x0027),
+    (pdi_release_for_maintenance, 0x0028),
+    (pdi_available, 0x0029),
+    (pdi_not_available, 0x002A),
+    (pdi_reset, 0x002B),
+    (sci_timeout, 0x000C)
+);
+
 impl SCIMessageType {
-    pub const fn sci_version_request() -> Self {
-        Self(0x0024)
-    }
-
-    pub const fn sci_version_response() -> Self {
-        Self(0x0025)
-    }
-
-    pub const fn sci_status_request() -> Self {
-        Self(0x0021)
-    }
-
-    pub const fn sci_status_begin() -> Self {
-        Self(0x0022)
-    }
-
-    pub const fn sci_status_finish() -> Self {
-        Self(0x0023)
-    }
-
-    pub const fn sci_close() -> Self {
-        Self(0x0027)
-    }
-
-    pub const fn sci_release_for_maintenance() -> Self {
-        Self(0x0028)
-    }
-
-    pub const fn sci_timeout() -> Self {
-        Self(0x000C)
-    }
-
     pub fn try_as_sci_message_type(&self) -> Result<&str, SciError> {
         match self.0 {
             0x0024 => Ok("VersionRequest"),
@@ -129,6 +216,9 @@ impl SCIMessageType {
             0x0023 => Ok("StatusFinish"),
             0x0027 => Ok("Close"),
             0x0028 => Ok("ReleaseForMaintenance"),
+            0x0029 => Ok("Available"),
+            0x002A => Ok("NotAvailable"),
+            0x002B => Ok("Reset"),
             0x000C => Ok("Timeout"),
             v => Err(SciError::UnknownMessageType(v)),
         }
@@ -136,18 +226,22 @@ impl SCIMessageType {
 
     pub fn try_as_sci_message_type_from(value: u16) -> Result<Self, SciError> {
         match value {
-            0x0024 => Ok(Self::sci_version_request()),
-            0x0025 => Ok(Self::sci_version_response()),
-            0x0021 => Ok(Self::sci_status_request()),
-            0x0022 => Ok(Self::sci_status_begin()),
-            0x0023 => Ok(Self::sci_status_finish()),
-            0x0027 => Ok(Self::sci_close()),
-            0x0028 => Ok(Self::sci_release_for_maintenance()),
+            0x0024 => Ok(Self::pdi_version_check()),
+            0x0025 => Ok(Self::pdi_version_response()),
+            0x0021 => Ok(Self::pdi_initialisation_request()),
+            0x0022 => Ok(Self::pdi_initialisation_response()),
+            0x0023 => Ok(Self::pdi_initialisation_completed()),
+            0x0027 => Ok(Self::pdi_close()),
+            0x0028 => Ok(Self::pdi_release_for_maintenance()),
+            0x0029 => Ok(Self::pdi_available()),
+            0x002A => Ok(Self::pdi_not_available()),
+            0x002B => Ok(Self::pdi_reset()),
             0x000C => Ok(Self::sci_timeout()),
             v => Err(SciError::UnknownMessageType(v)),
         }
     }
 
+    #[cfg(feature = "scip")]
     pub fn try_as_scip_message_type(&self) -> Result<&str, SciError> {
         match self.0 {
             0x0001 => Ok("ChangeLocation"),
@@ -156,6 +250,7 @@ impl SCIMessageType {
         }
     }
 
+    #[cfg(feature = "scip")]
     pub fn try_as_scip_message_type_from(value: u16) -> Result<Self, SciError> {
         match value {
             0x0001 => Ok(Self::scip_change_location()),
@@ -164,6 +259,7 @@ impl SCIMessageType {
         }
     }
 
+    #[cfg(feature = "scils")]
     pub fn try_as_scils_message_type(&self) -> Result<&str, SciError> {
         match self.0 {
             0x0001 => Ok("ShowSignalAspect"),
@@ -174,12 +270,47 @@ impl SCIMessageType {
         }
     }
 
+    #[cfg(feature = "scils")]
     pub fn try_as_scils_message_type_from(value: u16) -> Result<Self, SciError> {
         match value {
             0x0001 => Ok(Self::scils_show_signal_aspect()),
             0x0002 => Ok(Self::scils_change_brightness()),
             0x0003 => Ok(Self::scils_signal_aspect_status()),
             0x0004 => Ok(Self::scils_brightness_status()),
+            _ => Self::try_as_sci_message_type_from(value),
+        }
+    }
+
+    #[cfg(feature = "scitds")]
+    pub fn try_as_scitds_message_type(&self) -> Result<&str, SciError> {
+        match self.0 {
+            0x0001 => Ok("FC"),
+            0x0002 => Ok("UpdateFillingLevel"),
+            0x0003 => Ok("DRFC"),
+            0x0008 => Ok("Cancel"),
+            0x0006 => Ok("CommandRejected"),
+            0x0007 => Ok("TvpsOccupancyStatus"),
+            0x0010 => Ok("TvpsFcPFailed"),
+            0x0011 => Ok("TvpsFcPAFailed"),
+            0x0012 => Ok("AdditionalInformation"),
+            0x000B => Ok("TdpStatus"),
+            _ => self.try_as_sci_message_type(),
+        }
+    }
+
+    #[cfg(feature = "scitds")]
+    pub fn try_as_scitds_message_type_from(value: u16) -> Result<Self, SciError> {
+        match value {
+            0x0001 => Ok(Self::scitds_fc()),
+            0x0002 => Ok(Self::scitds_update_filling_level()),
+            0x0003 => Ok(Self::scitds_drfc()),
+            0x0008 => Ok(Self::scitds_cancel()),
+            0x0006 => Ok(Self::scitds_command_rejected()),
+            0x0007 => Ok(Self::scitds_tvps_occupancy_status()),
+            0x0010 => Ok(Self::scitds_tvps_fc_p_failed()),
+            0x0011 => Ok(Self::scitds_tvps_fc_p_a_failed()),
+            0x0012 => Ok(Self::scitds_additional_information()),
+            0x000B => Ok(Self::scitds_tdp_status()),
             _ => Self::try_as_sci_message_type_from(value),
         }
     }
@@ -221,7 +352,7 @@ pub enum SCICloseReason {
     NormalClose = 4,
     OtherVersionRequired = 5,
     Timeout = 6,
-    ChecksumMismatch = 7,    
+    ChecksumMismatch = 7,
 }
 
 impl TryFrom<u8> for SCICloseReason {
@@ -249,6 +380,14 @@ pub struct SCIPayload {
     pub used: usize,
 }
 
+impl Deref for SCIPayload {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.data[..self.used]
+    }
+}
+
 impl Default for SCIPayload {
     fn default() -> Self {
         Self {
@@ -259,7 +398,7 @@ impl Default for SCIPayload {
 }
 
 impl SCIPayload {
-    fn from_slice(data: &[u8]) -> Self {
+    pub fn from_slice(data: &[u8]) -> Self {
         let mut payload = Self {
             used: data.len(),
             ..Default::default()
@@ -280,8 +419,50 @@ pub struct SCITelegram {
     pub payload: SCIPayload,
 }
 
+impl Display for SCITelegram {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:?}: {}",
+            self.protocol_type,
+            match self.protocol_type {
+                #[cfg(feature = "scitds")]
+                ProtocolType::SCIProtocolTDS =>
+                    self.message_type.try_as_scitds_message_type().unwrap(),
+                #[cfg(feature = "scils")]
+                ProtocolType::SCIProtocolLS =>
+                    self.message_type.try_as_scils_message_type().unwrap(),
+                #[cfg(feature = "scip")]
+                ProtocolType::SCIProtocolP => self.message_type.try_as_scip_message_type().unwrap(),
+                _ => "Unsupported",
+            }
+        )
+    }
+}
+
+/// Automatically implement the associated functions for messages
+/// with no payload.
+#[macro_export]
+macro_rules! impl_sci_messages_without_payload {
+    ($protocol_type:expr, ($(($message:ident, $message_type:expr)),*)) => {
+        impl SCITelegram {
+            $(
+                pub fn $message(sender: &str, receiver: &str) -> Self {
+                    Self {
+                        protocol_type: $protocol_type,
+                        message_type: $message_type,
+                        sender: sender.to_string(),
+                        receiver: receiver.to_string(),
+                        payload: SCIPayload::default(),
+                    }
+                }
+            )*
+        }
+    };
+}
+
 impl SCITelegram {
-    pub fn version_request(
+    pub fn version_check(
         protocol_type: ProtocolType,
         sender: &str,
         receiver: &str,
@@ -289,7 +470,7 @@ impl SCITelegram {
     ) -> Self {
         Self {
             protocol_type,
-            message_type: SCIMessageType::sci_version_request(),
+            message_type: SCIMessageType::pdi_version_check(),
             sender: sender.to_string(),
             receiver: receiver.to_string(),
             payload: SCIPayload::from_slice(&[version]),
@@ -308,60 +489,81 @@ impl SCITelegram {
         payload_data.append(&mut Vec::from(checksum));
         Self {
             protocol_type,
-            message_type: SCIMessageType::sci_version_response(),
+            message_type: SCIMessageType::pdi_version_response(),
             sender: sender.to_string(),
             receiver: receiver.to_string(),
             payload: SCIPayload::from_slice(&payload_data),
         }
     }
 
-    pub fn status_request(protocol_type: ProtocolType, sender: &str, receiver: &str) -> Self {
+    pub fn initialisation_request(
+        protocol_type: ProtocolType,
+        sender: &str,
+        receiver: &str,
+    ) -> Self {
         Self {
             protocol_type,
-            message_type: SCIMessageType::sci_status_request(),
+            message_type: SCIMessageType::pdi_initialisation_request(),
             sender: sender.to_string(),
             receiver: receiver.to_string(),
             payload: SCIPayload::default(),
         }
     }
 
-    pub fn status_begin(protocol_type: ProtocolType, sender: &str, receiver: &str) -> Self {
+    pub fn initialisation_response(
+        protocol_type: ProtocolType,
+        sender: &str,
+        receiver: &str,
+    ) -> Self {
         Self {
             protocol_type,
-            message_type: SCIMessageType::sci_status_begin(),
+            message_type: SCIMessageType::pdi_initialisation_response(),
             sender: sender.to_string(),
             receiver: receiver.to_string(),
             payload: SCIPayload::default(),
         }
     }
 
-    pub fn status_finish(protocol_type: ProtocolType, sender: &str, receiver: &str) -> Self {
+    pub fn initialisation_completed(
+        protocol_type: ProtocolType,
+        sender: &str,
+        receiver: &str,
+    ) -> Self {
         Self {
             protocol_type,
-            message_type: SCIMessageType::sci_status_finish(),
+            message_type: SCIMessageType::pdi_initialisation_completed(),
             sender: sender.to_string(),
             receiver: receiver.to_string(),
             payload: SCIPayload::default(),
         }
     }
 
-    pub fn close(protocol_type: ProtocolType, sender: &str, receiver: &str, close_reason: SCICloseReason) -> Self {
+    pub fn close(
+        protocol_type: ProtocolType,
+        sender: &str,
+        receiver: &str,
+        close_reason: SCICloseReason,
+    ) -> Self {
         Self {
-            protocol_type, 
-            message_type: SCIMessageType::sci_close(),
+            protocol_type,
+            message_type: SCIMessageType::pdi_close(),
             sender: sender.to_string(),
             receiver: receiver.to_string(),
-            payload: SCIPayload::from_slice(&[close_reason as u8])
+            payload: SCIPayload::from_slice(&[close_reason as u8]),
         }
     }
 
-    pub fn release_for_maintenance(protocol_type: ProtocolType, sender: &str, receiver: &str) -> Self {
-        Self { 
+    pub fn release_for_maintenance(
+        protocol_type: ProtocolType,
+        sender: &str,
+        receiver: &str,
+    ) -> Self {
+        Self {
             protocol_type,
-            message_type: SCIMessageType::sci_release_for_maintenance(),
-            sender: sender.to_string(), 
+            message_type: SCIMessageType::pdi_release_for_maintenance(),
+            sender: sender.to_string(),
             receiver: receiver.to_string(),
-            payload: SCIPayload::default()
+            payload: SCIPayload::default(),
         }
     }
 
@@ -383,8 +585,19 @@ impl TryFrom<&[u8]> for SCITelegram {
         let protocol_type = ProtocolType::try_from(value[0])?;
         let message_type_as_u16 = u16::from_le_bytes(value[1..3].try_into().unwrap());
         let message_type = match protocol_type {
-            ProtocolType::SCIProtocolP => SCIMessageType::try_as_scip_message_type_from(message_type_as_u16)?,
-            ProtocolType::SCIProtocolLS => SCIMessageType::try_as_scils_message_type_from(message_type_as_u16)?
+            #[cfg(feature = "scip")]
+            ProtocolType::SCIProtocolP => {
+                SCIMessageType::try_as_scip_message_type_from(message_type_as_u16)?
+            }
+            #[cfg(feature = "scils")]
+            ProtocolType::SCIProtocolLS => {
+                SCIMessageType::try_as_scils_message_type_from(message_type_as_u16)?
+            }
+            #[cfg(feature = "scitds")]
+            ProtocolType::SCIProtocolTDS => {
+                SCIMessageType::try_as_scitds_message_type_from(message_type_as_u16)?
+            }
+            _ => unimplemented!(),
         };
         Ok(Self {
             protocol_type,
@@ -404,14 +617,14 @@ impl From<SCITelegram> for Vec<u8> {
         data.append(&mut str_to_sci_name(&val.sender));
         data.append(&mut str_to_sci_name(&val.receiver));
         if val.payload.used > 0 {
-            let mut payload = Vec::from(val.payload.data);
+            let mut payload = Vec::from(val.payload.as_ref());
             data.append(&mut payload);
         }
         data
     }
 }
 
-/// The SCI equivalent of [`crate::RastaCommand`].
+/// The SCI equivalent of [`rasta_rs::RastaCommand`].
 #[cfg(feature = "rasta")]
 #[derive(Clone)]
 pub enum SCICommand {

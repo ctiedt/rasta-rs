@@ -38,42 +38,42 @@ impl MessageBuilder {
     }
 
     pub fn length(mut self, len: u16) -> Self {
-        self.msg.content[0..2].copy_from_slice(&len.to_ne_bytes());
+        self.msg.content[0..2].copy_from_slice(&len.to_be_bytes());
         self
     }
 
     pub fn message_type(mut self, message_type: MessageType) -> Self {
-        self.msg.content[3..5].copy_from_slice(&(message_type as u16).to_ne_bytes());
+        self.msg.content[3..5].copy_from_slice(&(message_type as u16).to_be_bytes());
         self
     }
 
     pub fn receiver(mut self, receiver: RastaId) -> Self {
-        self.msg.content[6..10].copy_from_slice(&receiver.to_ne_bytes());
+        self.msg.content[6..10].copy_from_slice(&receiver.to_be_bytes());
         self
     }
 
     pub fn sender(mut self, sender: RastaId) -> Self {
-        self.msg.content[10..14].copy_from_slice(&sender.to_ne_bytes());
+        self.msg.content[10..14].copy_from_slice(&sender.to_be_bytes());
         self
     }
 
     pub fn sequence_number(mut self, sequence_number: u32) -> Self {
-        self.msg.content[15..19].copy_from_slice(&sequence_number.to_ne_bytes());
+        self.msg.content[15..19].copy_from_slice(&sequence_number.to_be_bytes());
         self
     }
 
     pub fn confirmed_sequence_number(mut self, confirmed_sequence_number: u32) -> Self {
-        self.msg.content[19..23].copy_from_slice(&confirmed_sequence_number.to_ne_bytes());
+        self.msg.content[19..23].copy_from_slice(&confirmed_sequence_number.to_be_bytes());
         self
     }
 
     pub fn timestamp(mut self, timestamp: u32) -> Self {
-        self.msg.content[24..28].copy_from_slice(&timestamp.to_ne_bytes());
+        self.msg.content[24..28].copy_from_slice(&timestamp.to_be_bytes());
         self
     }
 
     pub fn confirmed_timestamp(mut self, confirmed_timestamp: u32) -> Self {
-        self.msg.content[29..33].copy_from_slice(&confirmed_timestamp.to_ne_bytes());
+        self.msg.content[29..33].copy_from_slice(&confirmed_timestamp.to_be_bytes());
         self
     }
 
@@ -145,7 +145,7 @@ impl Message {
     ) -> Self {
         let mut data = [0; 14];
         data[..4].copy_from_slice(&RASTA_VERSION);
-        data[5..7].copy_from_slice(&n_sendmax.to_ne_bytes());
+        data[5..7].copy_from_slice(&n_sendmax.to_be_bytes());
         let initial_seq_nr = if cfg!(feature = "rand") {
             rand::random()
         } else {
@@ -175,7 +175,7 @@ impl Message {
     ) -> Self {
         let mut data = [0; 14];
         data[..4].copy_from_slice(&RASTA_VERSION);
-        data[5..7].copy_from_slice(&n_sendmax.to_ne_bytes());
+        data[5..7].copy_from_slice(&n_sendmax.to_be_bytes());
         let sequence_number = confirmed_sequence_number + 1;
         MessageBuilder::new()
             .length(50)

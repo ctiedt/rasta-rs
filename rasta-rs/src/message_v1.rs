@@ -14,7 +14,7 @@ pub struct Message<const N: usize> {
 
 impl Message<14> {
     pub fn connection_request(receiver: u32, sender: u32, timestamp: u32, n_sendmax: u16) -> Self {
-        let sendmax = n_sendmax.to_ne_bytes();
+        let sendmax = n_sendmax.to_be_bytes();
         Self {
             length: 50,
             message_type: MessageType::ConnReq,
@@ -40,7 +40,7 @@ impl Message<14> {
         confirmed_timestamp: u32,
         n_sendmax: u16,
     ) -> Self {
-        let sendmax = n_sendmax.to_ne_bytes();
+        let sendmax = n_sendmax.to_be_bytes();
         Self {
             length: 50,
             message_type: MessageType::ConnReq,
