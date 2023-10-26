@@ -384,7 +384,7 @@ impl Deref for SCIPayload {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        &self.data
+        &self.data[..self.used]
     }
 }
 
