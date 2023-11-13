@@ -4,7 +4,7 @@ use std::fmt::Display;
 
 use crate::{
     impl_sci_message_type, impl_sci_messages_without_payload, ProtocolType, SCIMessageType,
-    SCIPayload, SCITelegram,
+    SCIPayload, SCITelegram, SciError,
 };
 
 #[derive(Clone, Debug)]
@@ -249,6 +249,91 @@ impl SCITelegram {
             sender: sender.to_string(),
             receiver: receiver.to_string(),
             payload: SCIPayload::from_slice(&[state_of_passing as u8, direction_of_passing as u8]),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct OccupancyStatusPayload {
+    pub occupancy_status: OccupancyStatus,
+    pub can_be_forced_to_clear: bool,
+    pub filling_level: u16,
+    pub pom_status: POMStatus,
+    pub disturbance_status: DisturbanceStatus,
+    pub change_trigger: ChangeTrigger,
+}
+
+impl TryFrom<SCIPayload> for OccupancyStatusPayload {
+    type Error = SciError;
+
+    fn try_from(value: SCIPayload) -> Result<Self, Self::Error> {
+        if value.len() != 7 {
+            return Err(SciError::Tds(SciTdsError::UnknownOccupancyStatus(0)));
+        }
+        Ok(OccupancyStatusPayload {
+            occupancy_status: OccupancyStatus::try_from(value[0])?,
+            can_be_forced_to_clear: match value[1] {
+                1 => false,
+                2 => true,
+                _ => unreachable!(),
+            },
+            filling_level: u16::from_be_bytes([value[2], value[3]]),
+            pom_status: POMStatus::try_from(value[4])?,
+            disturbance_status: DisturbanceStatus::try_from(value[5])?,
+            change_trigger: ChangeTrigger::try_from(value[6])?,
+        })
+    }
+}
+
+#[cfg(feature = "neupro")]
+#[derive(Clone, Copy)]
+pub struct NeuProOccupancyStatusPayload {
+    pub occupancy_status: OccupancyStatus,
+    pub can_be_forced_to_clear: bool,
+    pub filling_level: u16,
+}
+
+#[cfg(feature = "neupro")]
+impl TryFrom<SCIPayload> for NeuProOccupancyStatusPayload {
+    type Error = SciError;
+
+    fn try_from(value: SCIPayload) -> Result<Self, Self::Error> {
+        if value.len() != 7 {
+            return Err(SciError::Tds(SciTdsError::UnknownOccupancyStatus(0)));
+        }
+        Ok(NeuProOccupancyStatusPayload {
+            occupancy_status: OccupancyStatus::try_from(value[0])?,
+            can_be_forced_to_clear: match value[1] {
+                0 => false,
+                1 => true,
+                _ => unreachable!(),
+            },
+            filling_level: u16::from_be_bytes([value[2], value[3]]),
+        })
+    }
+}
+
+#[cfg(feature = "neupro")]
+impl From<NeuProOccupancyStatusPayload> for OccupancyStatusPayload {
+    fn from(value: NeuProOccupancyStatusPayload) -> Self {
+        OccupancyStatusPayload {
+            occupancy_status: value.occupancy_status,
+            can_be_forced_to_clear: value.can_be_forced_to_clear,
+            filling_level: value.filling_level,
+            pom_status: POMStatus::NotApplicable,
+            disturbance_status: DisturbanceStatus::NotApplicable,
+            change_trigger: ChangeTrigger::NotApplicable,
+        }
+    }
+}
+
+#[cfg(feature = "neupro")]
+impl From<OccupancyStatusPayload> for NeuProOccupancyStatusPayload {
+    fn from(value: OccupancyStatusPayload) -> Self {
+        NeuProOccupancyStatusPayload {
+            occupancy_status: value.occupancy_status,
+            can_be_forced_to_clear: value.can_be_forced_to_clear,
+            filling_level: value.filling_level,
         }
     }
 }

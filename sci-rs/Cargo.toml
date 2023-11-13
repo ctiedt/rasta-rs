@@ -26,6 +26,7 @@ required-features = ["rasta"]
 
 [features]
 default = ["scip", "scils", "scitds"]
+neupro = []
 rasta = ["rasta-rs"]
 scip = []
 scils = []
