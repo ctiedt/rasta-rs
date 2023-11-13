@@ -285,6 +285,20 @@ impl TryFrom<SCIPayload> for OccupancyStatusPayload {
     }
 }
 
+impl From<OccupancyStatusPayload> for SCIPayload {
+    fn from(value: OccupancyStatusPayload) -> Self {
+        SCIPayload::from_slice(&[
+            value.occupancy_status as u8,
+            if value.can_be_forced_to_clear { 2 } else { 1 },
+            value.filling_level.to_be_bytes()[0],
+            value.filling_level.to_be_bytes()[1],
+            value.pom_status as u8,
+            value.disturbance_status as u8,
+            value.change_trigger as u8,
+        ])
+    }
+}
+
 #[cfg(feature = "neupro")]
 #[derive(Clone, Copy)]
 pub struct NeuProOccupancyStatusPayload {
