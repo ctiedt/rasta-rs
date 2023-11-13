@@ -313,8 +313,8 @@ impl TryFrom<SCIPayload> for NeuProOccupancyStatusPayload {
     type Error = SciError;
 
     fn try_from(value: SCIPayload) -> Result<Self, Self::Error> {
-        if value.len() != 7 {
-            return Err(SciError::Tds(SciTdsError::UnknownOccupancyStatus(0)));
+        if value.len() != 4 {
+            return Err(SciError::Tds(SciTdsError::BadPayloadLength(value.len())));
         }
         Ok(NeuProOccupancyStatusPayload {
             occupancy_status: OccupancyStatus::try_from(value[0])?,
