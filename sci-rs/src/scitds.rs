@@ -18,6 +18,7 @@ pub enum SciTdsError {
     UnknownFCPFailureReason(u8),
     UnknownStateOfPassing(u8),
     UnknownDirectionOfPassing(u8),
+    BadPayloadLength(usize),
 }
 
 impl Display for SciTdsError {
@@ -268,7 +269,7 @@ impl TryFrom<SCIPayload> for OccupancyStatusPayload {
 
     fn try_from(value: SCIPayload) -> Result<Self, Self::Error> {
         if value.len() != 7 {
-            return Err(SciError::Tds(SciTdsError::UnknownOccupancyStatus(0)));
+            return Err(SciError::Tds(SciTdsError::BadPayloadLength(value.len())));
         }
         Ok(OccupancyStatusPayload {
             occupancy_status: OccupancyStatus::try_from(value[0])?,
