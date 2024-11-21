@@ -303,7 +303,8 @@ impl TryFrom<u8> for SCILSDrivewayInformation {
 pub enum SCILSDarkSwitching {
     #[default]
     Show = 0x01,
-    Dark = 0xFF,
+    Dark = 0x0F,
+    NotApplicable = 0xFF,
 }
 
 impl TryFrom<u8> for SCILSDarkSwitching {
@@ -312,7 +313,8 @@ impl TryFrom<u8> for SCILSDarkSwitching {
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             0x01 => Ok(Self::Show),
-            0xFF => Ok(Self::Dark),
+            0x0F => Ok(Self::Dark),
+            0xFF => Ok(Self::NotApplicable),
             v => Err(SciLsError::InvalidDarkSwitching(v).into()),
         }
     }
