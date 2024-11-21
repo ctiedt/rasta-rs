@@ -301,9 +301,9 @@ impl TryFrom<u8> for SCILSDrivewayInformation {
 #[derive(Default, Clone, Copy)]
 #[repr(u8)]
 pub enum SCILSDarkSwitching {
-    #[default]
     Show = 0x01,
     Dark = 0x0F,
+    #[default]
     NotApplicable = 0xFF,
 }
 
